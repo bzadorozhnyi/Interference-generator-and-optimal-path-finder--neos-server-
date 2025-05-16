@@ -1,0 +1,9 @@
+[package]
+name = "interference_generator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+eframe = "0.31.1"
+tera = "1.20.0"
+regex = "1.11.1"
