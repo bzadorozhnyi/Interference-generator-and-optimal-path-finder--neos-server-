@@ -14,6 +14,7 @@ pub struct NeosAPI {
     tx: Sender<NeosResponse>,
     pub rx: Receiver<NeosResponse>,
     pub response: String,
+    pub is_solving_task: bool
 }
 
 impl NeosAPI {
@@ -26,6 +27,7 @@ impl NeosAPI {
             tx,
             rx,
             response: String::new(),
+            is_solving_task: false
         }
     }
 
@@ -44,8 +46,9 @@ impl NeosAPI {
         });
     }
 
-    pub fn submit_job(&self, input: String) {
+    pub fn submit_job(&mut self, input: String) {
         let (client, tx) = self.clone_client_tx();
+        self.is_solving_task = true;
 
         tokio::spawn(async move {
             let response: Result<(i32, String), dxr_client::ClientError> =

@@ -107,8 +107,11 @@ impl eframe::App for MyApp {
             ui.columns(2, |columns| {
                 self.field.setup(&mut columns[0]);
 
-                if self.neos_output.is_empty() {
-                    // columns[1].spinner();
+                if self.neos.is_solving_task {
+                    columns[1].horizontal(|ui| {
+                        ui.spinner();
+                        ui.label("Solving task");
+                    });
                 } else {
                     egui::ScrollArea::vertical()
                         .max_height(self.field.size())
@@ -173,6 +176,7 @@ impl eframe::App for MyApp {
                         self.neos.get_final_results(job_number, job_password);
                     }
                     NeosResponse::JobOuput(output) => {
+                        self.neos.is_solving_task = false;
                         match self.field.parse_path(&output) {
                             Ok(_) => {}
                             Err(e) => self.handle_app_error(e),
