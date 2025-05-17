@@ -57,7 +57,7 @@ impl NeosAPI {
             if let Ok(body) = response {
                 match body {
                     (0, error_msg) => {
-                        let _ = tx.send(NeosResponse::Message(error_msg));
+                        let _ = tx.send(NeosResponse::Error(error_msg));
                     }
                     (job_number, job_password) => {
                         let _ = tx.send(NeosResponse::JobCredentials(job_number, job_password));

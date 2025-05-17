@@ -11,3 +11,6 @@ dxr = "0.7.1"
 dxr_client = { version = "0.7.1", features = ["reqwest"] }
 tokio = { version = "1", features = ["full"] }
 dotenvy = "0.15"
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8.22"
+email_address = "0.2.9"

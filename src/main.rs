@@ -1,4 +1,5 @@
 use eframe::egui::{self, Color32};
+use interference_generator::config::editor::ConfigEditor;
 use interference_generator::error::AppError;
 use interference_generator::neos::api::NeosAPI;
 use interference_generator::neos::response::NeosResponse;
@@ -48,6 +49,7 @@ struct MyApp {
     toast: Option<Toast>,
     neos: NeosAPI,
     neos_output: String,
+    config_editor: ConfigEditor,
 }
 
 impl Default for MyApp {
@@ -59,6 +61,7 @@ impl Default for MyApp {
             toast: None,
             neos: NeosAPI::new(),
             neos_output: String::new(),
+            config_editor: ConfigEditor::new(),
         }
     }
 }
@@ -67,6 +70,10 @@ impl eframe::App for MyApp {
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
+                if ui.button("Config").clicked() {
+                    self.config_editor.open();
+                }
+
                 ui.selectable_value(&mut self.mode, Mode::Draw, "Draw");
                 ui.selectable_value(&mut self.mode, Mode::Erase, "Erase");
                 ui.selectable_value(&mut self.mode, Mode::StartSelection, "Start");
@@ -93,7 +100,10 @@ impl eframe::App for MyApp {
                 }
 
                 if ui.button("Send to NEOS").clicked() {
-                    match self.template.generate_neos_input_string(&self.field) {
+                    match self
+                        .template
+                        .generate_neos_input_string(&self.field, &self.config_editor.config.email)
+                    {
                         Ok(input) => {
                             self.neos.submit_job(input);
                         }
@@ -155,6 +165,10 @@ impl eframe::App for MyApp {
                 }
             }
 
+            if self.config_editor.is_open() {
+                self.config_editor.show(ui);
+            }
+
             ui.label(format!("NEOS response :: {}", self.neos.response));
 
             match self.mode {
@@ -166,6 +180,10 @@ impl eframe::App for MyApp {
 
             if let Ok(neos_response) = self.neos.rx.try_recv() {
                 match neos_response {
+                    NeosResponse::Error(msg) => {
+                        self.neos.is_solving_task = false;
+                        self.neos.response = msg
+                    },
                     NeosResponse::Message(msg) => self.neos.response = msg,
                     NeosResponse::JobCredentials(job_number, job_password) => {
                         self.neos.response = format!(
@@ -207,6 +225,9 @@ impl MyApp {
             }
             AppError::InvalidAuthCredentials => {
                 self.show_toast("Invalid auth credentials", ToastVariant::Error);
+            }
+            AppError::FailedUpdateConfig => {
+                self.show_toast("Failed update config", ToastVariant::Error);
             }
         }
     }

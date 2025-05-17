@@ -4,5 +4,6 @@ pub enum AppError {
     StartNotSet,
     EndNotSet,
     FailedRenderFile,
-    InvalidAuthCredentials
+    InvalidAuthCredentials,
+    FailedUpdateConfig
 }

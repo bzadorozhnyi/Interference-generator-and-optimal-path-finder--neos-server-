@@ -1,5 +1,3 @@
-use std::env;
-
 use tera::Tera;
 
 use crate::{error::AppError, field::Field};
@@ -12,7 +10,11 @@ pub enum Template {
 }
 
 impl Template {
-    pub fn generate_neos_input_string(&self, field: &Field) -> Result<String, AppError> {
+    pub fn generate_neos_input_string(
+        &self,
+        field: &Field,
+        email: &str,
+    ) -> Result<String, AppError> {
         let tera = Tera::new("template/*.tera").expect("Failed to load template");
 
         let mut context = tera::Context::new();
@@ -63,8 +65,7 @@ impl Template {
                 <comments></comments>
             </MyProblem>
             ",
-            env::var("EMAIL").unwrap(),
-            code
+            email, code
         );
 
         Ok(xml_input)

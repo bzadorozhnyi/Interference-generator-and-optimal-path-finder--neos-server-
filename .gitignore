@@ -1,3 +1,4 @@
 /target
 path.txt
 .env
+config.toml
