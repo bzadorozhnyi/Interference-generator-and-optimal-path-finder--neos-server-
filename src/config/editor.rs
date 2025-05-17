@@ -7,7 +7,7 @@ pub struct ConfigEditor {
     pub config: Config,
     open: bool,
     email_buffer: String,
-    error_msg: String
+    error_msg: String,
 }
 
 impl ConfigEditor {
@@ -18,7 +18,7 @@ impl ConfigEditor {
             email_buffer: config.email.clone(),
             config,
             open: false,
-            error_msg: String::new()
+            error_msg: String::new(),
         }
     }
 
@@ -53,23 +53,27 @@ impl ConfigEditor {
 
             ui.horizontal(|ui| {
                 if ui.button("Save").clicked() {
-                    
                     if EmailAddress::is_valid(&self.email_buffer) {
                         self.config.email = self.email_buffer.clone();
                         let _ = self.config.save();
                         self.close();
-                    }
-                    else {
+                    } else {
                         self.error_msg = "Invalid email".to_string();
                     }
                 }
 
                 ui.add_space(10.0);
-    
+
                 if ui.button("Cancel").clicked() {
                     self.close();
                 }
             });
         });
+    }
+}
+
+impl Default for ConfigEditor {
+    fn default() -> Self {
+        Self::new()
     }
 }
