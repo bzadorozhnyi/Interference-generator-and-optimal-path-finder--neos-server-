@@ -7,3 +7,7 @@ edition = "2021"
 eframe = "0.31.1"
 tera = "1.20.0"
 regex = "1.11.1"
+dxr = "0.7.1"
+dxr_client = { version = "0.7.1", features = ["reqwest"] }
+tokio = { version = "1", features = ["full"] }
+dotenvy = "0.15"

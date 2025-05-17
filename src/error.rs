@@ -1,6 +1,8 @@
-pub enum FieldError {
+pub enum AppError {
     InvalidPath,
     ParseStringError(String),
     StartNotSet,
-    EndNotSet
+    EndNotSet,
+    FailedRenderFile,
+    InvalidAuthCredentials
 }

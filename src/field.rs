@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use crate::{cell::Cell, error::FieldError, re};
+use crate::{cell::Cell, error::AppError, re};
 use eframe::egui::{
     Align2, Color32, FontId, Painter, Pos2, Rect, Response, Sense, Stroke, Ui, Vec2,
 };
@@ -60,17 +60,21 @@ impl Field {
         self.painter = Some(painter);
     }
 
-    fn parse_coord(&self, name: &str, caps: &regex::Captures) -> Result<usize, FieldError> {
+    pub fn size(&self) -> f32 {
+        self.field_size as f32 * self.cell_size
+    }
+
+    fn parse_coord(&self, name: &str, caps: &regex::Captures) -> Result<usize, AppError> {
         caps.name(name)
-            .ok_or_else(|| FieldError::ParseStringError(format!("Missing field: {}", name)))
+            .ok_or_else(|| AppError::ParseStringError(format!("Missing field: {}", name)))
             .and_then(|m| {
                 m.as_str()
                     .parse::<usize>()
-                    .map_err(|_| FieldError::ParseStringError(name.to_string()))
+                    .map_err(|_| AppError::ParseStringError(name.to_string()))
             })
     }
 
-    fn parse_cells(&self, row: &str) -> Result<(Cell, Cell), FieldError> {
+    fn parse_cells(&self, row: &str) -> Result<(Cell, Cell), AppError> {
         let caps = re::PATH_PARSER.captures(row);
         if let Some(caps) = caps {
             let first_x = self.parse_coord("first_x", &caps)? - 1;
@@ -83,38 +87,36 @@ impl Field {
 
             Ok((first_cell, second_cell))
         } else {
-            Err(FieldError::ParseStringError(row.to_string()))
+            Err(AppError::ParseStringError(row.to_string()))
         }
     }
 
-    pub fn parse_path(&mut self, path: &String) -> Result<(), FieldError> {
-        let path_cells: Result<Vec<(Cell, Cell)>, FieldError> = path
+    pub fn parse_path(&mut self, path: &str) -> Result<(), AppError> {
+        let mut current_cell = match self.start_cell {
+            Some(cell) => cell,
+            None => return Err(AppError::StartNotSet),
+        };
+
+        let end = match self.end_cell {
+            Some(cell) => cell,
+            None => return Err(AppError::EndNotSet),
+        };
+
+        let path_cells: Result<Vec<(Cell, Cell)>, AppError> = path
             .split("\n")
             .filter(|s| !s.is_empty())
-            .map(|row| {
-                self.parse_cells(row)
-            })
+            .map(|row| self.parse_cells(row))
+            .filter(|x| x.is_ok())
             .collect::<Vec<_>>()
             .into_iter()
             .collect();
 
         let data: BTreeMap<Cell, Cell> = path_cells?.into_iter().collect();
-
         let mut path = Vec::new();
-
-        let mut current_cell = match self.start_cell {
-            Some(cell) => cell,
-            None => return Err(FieldError::StartNotSet),
-        };
-
-        let end = match self.end_cell {
-            Some(cell) => cell,
-            None => return Err(FieldError::EndNotSet),
-        };
 
         while current_cell != end {
             path.push(current_cell);
-            current_cell = *data.get(&current_cell).ok_or(FieldError::InvalidPath)?;
+            current_cell = *data.get(&current_cell).ok_or(AppError::InvalidPath)?;
         }
         path.push(end);
 
@@ -131,15 +133,13 @@ impl Field {
             }
         };
 
-        for prev_and_next_cells in path.windows(2) {
-            let prev_cell = &prev_and_next_cells[0];
-            let next_cell = &prev_and_next_cells[1];
-
+        path.windows(2).for_each(|w| {
+            let [prev_cell, next_cell] = w else { return };
             self.painter().line(
                 vec![self.cell2pos2(prev_cell), self.cell2pos2(next_cell)],
                 Stroke::new(4.0, Color32::PURPLE),
             );
-        }
+        });
     }
 
     fn cell2pos2(&self, cell: &Cell) -> Pos2 {
@@ -152,28 +152,29 @@ impl Field {
     }
 
     pub fn draw_filled_cells(&self) {
-        let field_rect = self.response().rect;
+        self.draw_field();
 
-        // draw field
+        self.draw_path();
+
+        self.draw_endpoint(&self.start_cell, "S", Color32::RED);
+        self.draw_endpoint(&self.end_cell, "T", Color32::ORANGE);
+
+        self.draw_hovered_cell();
+    }
+
+    fn draw_field(&self) {
         for x in 0..self.field_size {
             for y in 0..self.field_size {
-                let cell_min = Pos2::new(
-                    field_rect.left() + x as f32 * self.cell_size,
-                    field_rect.top() + y as f32 * self.cell_size,
-                );
-                let cell_max = Pos2::new(cell_min.x + self.cell_size, cell_min.y + self.cell_size);
+                let current_cell = Cell::new(x, y);
 
-                let cell_rect = Rect::from_min_max(cell_min, cell_max);
-                let cell_cord = Cell::new(x, y);
-
-                let color = if self.filled_cells.contains(&cell_cord) {
+                let color = if self.filled_cells.contains(&current_cell) {
                     Color32::DARK_GREEN
                 } else {
                     Color32::LIGHT_GRAY
                 };
 
                 self.painter().rect(
-                    cell_rect,
+                    self.cell_rect(&current_cell),
                     0.0,
                     color,
                     Stroke::new(1.0, Color32::GRAY),
@@ -181,65 +182,50 @@ impl Field {
                 );
             }
         }
+    }
 
-        self.draw_path();
+    fn draw_endpoint(&self, cell: &Option<Cell>, label: &str, color: Color32) {
+        let field_rect = self.response().rect;
 
-        // draw start and end cells
-        match &self.start_cell {
-            Some(cell) => {
-                let start_pos = Pos2::new(
-                    field_rect.left() + cell.x as f32 * self.cell_size + self.cell_size / 2.0,
-                    field_rect.top() + cell.y as f32 * self.cell_size + self.cell_size / 2.0,
-                );
-                self.painter()
-                    .circle(start_pos, self.cell_size / 2.0, Color32::RED, Stroke::NONE);
-                self.painter().text(
-                    start_pos,
-                    Align2::CENTER_CENTER,
-                    "S",
-                    FontId::default(),
-                    Color32::BLACK,
-                );
-            }
-            None => {}
-        }
-
-        match &self.end_cell {
-            Some(cell) => {
-                let end_pos = Pos2::new(
-                    field_rect.left() + cell.x as f32 * self.cell_size + self.cell_size / 2.0,
-                    field_rect.top() + cell.y as f32 * self.cell_size + self.cell_size / 2.0,
-                );
-                self.painter()
-                    .circle(end_pos, self.cell_size / 2.0, Color32::ORANGE, Stroke::NONE);
-                self.painter().text(
-                    end_pos,
-                    Align2::CENTER_CENTER,
-                    "T",
-                    FontId::default(),
-                    Color32::BLACK,
-                );
-            }
-            None => {}
-        }
-
-        if let Some(cell) = self.hovered_cell() {
-            let cell_min = Pos2::new(
-                field_rect.left() + cell.x as f32 * self.cell_size,
-                field_rect.top() + cell.y as f32 * self.cell_size,
+        if let Some(cell) = cell {
+            let end_pos = Pos2::new(
+                field_rect.left() + cell.x as f32 * self.cell_size + self.cell_size / 2.0,
+                field_rect.top() + cell.y as f32 * self.cell_size + self.cell_size / 2.0,
             );
-            let cell_max = Pos2::new(cell_min.x + self.cell_size, cell_min.y + self.cell_size);
+            self.painter()
+                .circle(end_pos, self.cell_size / 2.0, color, Stroke::NONE);
+            self.painter().text(
+                end_pos,
+                Align2::CENTER_CENTER,
+                label,
+                FontId::default(),
+                Color32::BLACK,
+            );
+        }
+    }
 
-            let cell_rect = Rect::from_min_max(cell_min, cell_max);
-
+    fn draw_hovered_cell(&self) {
+        if let Some(cell) = self.hovered_cell() {
             self.painter().rect(
-                cell_rect,
+                self.cell_rect(&cell),
                 0.0,
                 Color32::TRANSPARENT,
                 Stroke::new(2.0, Color32::BLUE),
                 eframe::egui::StrokeKind::Middle,
             );
         }
+    }
+
+    fn cell_rect(&self, cell: &Cell) -> Rect {
+        let field_rect = self.response().rect;
+
+        let cell_min = Pos2::new(
+            field_rect.left() + cell.x as f32 * self.cell_size,
+            field_rect.top() + cell.y as f32 * self.cell_size,
+        );
+        let cell_max = Pos2::new(cell_min.x + self.cell_size, cell_min.y + self.cell_size);
+
+        Rect::from_min_max(cell_min, cell_max)
     }
 
     fn pos2cell(&self, pos: Option<Pos2>) -> Option<Cell> {
@@ -269,49 +255,36 @@ impl Field {
     }
 
     pub fn handle_adding_cells(&mut self) {
-        match self.clicked_cell() {
-            Some(cell) => {
-                if self.start_cell.as_ref() == Some(&cell) || self.end_cell.as_ref() == Some(&cell)
-                {
-                    return;
-                }
-                self.filled_cells.insert(cell);
+        if let Some(cell) = self.clicked_cell() {
+            if self.start_cell.as_ref() == Some(&cell) || self.end_cell.as_ref() == Some(&cell) {
+                return;
             }
-            None => return,
+            self.filled_cells.insert(cell);
         }
     }
 
     pub fn handle_removing_cells(&mut self) {
-        match self.clicked_cell() {
-            Some(cell) => {
-                self.filled_cells.remove(&cell);
-            }
-            None => return,
+        if let Some(cell) = self.clicked_cell() {
+            self.filled_cells.remove(&cell);
         }
     }
 
     pub fn handle_start_cell_selection(&mut self) {
-        match self.clicked_cell() {
-            Some(cell) => {
-                if !self.filled_cells.contains(&cell) {
-                    self.start_cell = Some(cell)
-                }
+        if let Some(cell) = self.clicked_cell() {
+            if !self.filled_cells.contains(&cell) {
+                self.start_cell = Some(cell)
             }
-            None => return,
         }
     }
 
     pub fn handle_end_cell_selection(&mut self) {
-        match self.clicked_cell() {
-            Some(cell) => {
-                if !self.filled_cells.contains(&cell) {
-                    self.end_cell = Some(cell)
-                }
+        if let Some(cell) = self.clicked_cell() {
+            if !self.filled_cells.contains(&cell) {
+                self.end_cell = Some(cell)
             }
-            None => return,
         }
     }
-    
+
     pub fn clear_path(&mut self) {
         self.path = None;
     }

@@ -1,16 +1,29 @@
 use eframe::egui::{self, Color32};
-use interference_generator::error::FieldError;
+use interference_generator::error::AppError;
+use interference_generator::neos::api::NeosAPI;
+use interference_generator::neos::response::NeosResponse;
+use interference_generator::template::Template;
 use interference_generator::{
     field::Field,
     toast::{Toast, ToastVariant},
 };
-use tera::Tera;
 
 fn main() -> eframe::Result {
+    dotenvy::dotenv().ok();
+
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([1280.0, 720.0]),
         ..Default::default()
     };
+
+    let rt = tokio::runtime::Runtime::new().expect("Unable to create Runtime");
+    // Enter the runtime so that `tokio::spawn` is available immediately.
+    let _enter = rt.enter();
+
+    // Execute the runtime in its own thread.
+    // The future doesn't have to do anything. In this example, it just sleeps forever.
+    #[allow(clippy::empty_loop)]
+    std::thread::spawn(move || rt.block_on(async { loop {} }));
 
     eframe::run_native(
         "Interference generator",
@@ -28,19 +41,13 @@ enum Mode {
     EndSelection,
 }
 
-#[derive(Debug, PartialEq)]
-enum Template {
-    Default,
-    Eight,
-    Disabled,
-}
-
 struct MyApp {
     field: Field,
     mode: Mode,
     template: Template,
     toast: Option<Toast>,
-    input_path: String,
+    neos: NeosAPI,
+    neos_output: String,
 }
 
 impl Default for MyApp {
@@ -48,9 +55,10 @@ impl Default for MyApp {
         Self {
             field: Field::new(),
             mode: Mode::Draw,
-            template: Template::Default,
+            template: Template::Disabled,
             toast: None,
-            input_path: String::new(),
+            neos: NeosAPI::new(),
+            neos_output: String::new(),
         }
     }
 }
@@ -65,7 +73,7 @@ impl eframe::App for MyApp {
                 ui.selectable_value(&mut self.mode, Mode::EndSelection, "Terminal");
 
                 egui::ComboBox::from_label("Template")
-                    .selected_text(self.template_name())
+                    .selected_text(self.template.name())
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut self.template, Template::Default, "path");
                         ui.selectable_value(&mut self.template, Template::Eight, "path_8");
@@ -76,32 +84,21 @@ impl eframe::App for MyApp {
                         );
                     });
 
-                if ui.button("Generate file").clicked() {
-                    self.generate_file();
-                }
-
-                if ui.button("Draw path").clicked() {
-                    match self.field.parse_path(&self.input_path) {
-                        Ok(_) => {}
-                        Err(e) => match e {
-                            FieldError::ParseStringError(message) => {
-                                self.show_toast(&message, ToastVariant::Error)
-                            }
-                            FieldError::StartNotSet => {
-                                self.show_toast("Start not set", ToastVariant::Error)
-                            }
-                            FieldError::EndNotSet => {
-                                self.show_toast("End not set", ToastVariant::Error)
-                            }
-                            FieldError::InvalidPath => {
-                                self.show_toast("Invalid path", ToastVariant::Error);
-                            },
-                        },
-                    }
-                }
-
                 if ui.button("Clear path").clicked() {
                     self.field.clear_path();
+                }
+
+                if ui.button("Ping NEOS").clicked() {
+                    self.neos.ping();
+                }
+
+                if ui.button("Send to NEOS").clicked() {
+                    match self.template.generate_neos_input_string(&self.field) {
+                        Ok(input) => {
+                            self.neos.submit_job(input);
+                        }
+                        Err(e) => self.handle_app_error(e),
+                    }
                 }
             });
 
@@ -110,7 +107,15 @@ impl eframe::App for MyApp {
             ui.columns(2, |columns| {
                 self.field.setup(&mut columns[0]);
 
-                columns[1].text_edit_multiline(&mut self.input_path);
+                if self.neos_output.is_empty() {
+                    // columns[1].spinner();
+                } else {
+                    egui::ScrollArea::vertical()
+                        .max_height(self.field.size())
+                        .show(&mut columns[1], |ui| {
+                            ui.label(&self.neos_output);
+                        });
+                }
             });
 
             match self.field.hovered_cell() {
@@ -147,75 +152,58 @@ impl eframe::App for MyApp {
                 }
             }
 
+            ui.label(format!("NEOS response :: {}", self.neos.response));
+
             match self.mode {
                 Mode::Draw => self.field.handle_adding_cells(),
                 Mode::Erase => self.field.handle_removing_cells(),
                 Mode::StartSelection => self.field.handle_start_cell_selection(),
                 Mode::EndSelection => self.field.handle_end_cell_selection(),
             }
+
+            if let Ok(neos_response) = self.neos.rx.try_recv() {
+                match neos_response {
+                    NeosResponse::Message(msg) => self.neos.response = msg,
+                    NeosResponse::JobCredentials(job_number, job_password) => {
+                        self.neos.response = format!(
+                            "Submitted job: (number = {}, password = {})",
+                            job_number, job_password
+                        );
+
+                        self.neos.get_final_results(job_number, job_password);
+                    }
+                    NeosResponse::JobOuput(output) => {
+                        match self.field.parse_path(&output) {
+                            Ok(_) => {}
+                            Err(e) => self.handle_app_error(e),
+                        }
+                        self.neos_output = output;
+                    }
+                }
+            }
         });
     }
 }
 
 impl MyApp {
-    fn generate_file(&mut self) {
-        let tera = Tera::new("template/*.tera").expect("Failed to load template");
-
-        let mut context = tera::Context::new();
-
-        context.insert("size", &self.field.field_size);
-
-        if self.field.start_cell.is_none() {
-            self.show_toast("Start point wasn't set", ToastVariant::Error);
-            return;
-        }
-
-        if self.field.end_cell.is_none() {
-            self.show_toast("End point wasn't set", ToastVariant::Error);
-            return;
-        }
-
-        context.insert("start_x", &(self.field.start_cell.as_ref().unwrap().x + 1));
-        context.insert("start_y", &(self.field.start_cell.as_ref().unwrap().y + 1));
-
-        context.insert("end_x", &(self.field.end_cell.as_ref().unwrap().x + 1));
-        context.insert("end_y", &(self.field.end_cell.as_ref().unwrap().y + 1));
-
-        context.insert(
-            "disabled_nodes",
-            &self
-                .field
-                .filled_cells
-                .iter()
-                .map(|c| format!("({},{})", c.x + 1, c.y + 1))
-                .collect::<Vec<_>>()
-                .join(" "),
-        );
-
-        match tera.render(self.template_name(), &context) {
-            Ok(output) => match std::fs::write("path.txt", output) {
-                Ok(_) => {
-                    self.show_toast("File generated", ToastVariant::Success);
-                }
-                Err(_) => {
-                    self.show_toast("Failed to write file", ToastVariant::Error);
-                }
-            },
-            Err(_) => {
-                self.show_toast("Failed to render", ToastVariant::Error);
-            }
-        }
-    }
-
-    fn template_name(&self) -> &str {
-        match self.template {
-            Template::Default => "path.tera",
-            Template::Eight => "path_8.tera",
-            Template::Disabled => "path_disabled.tera",
-        }
-    }
-
     fn show_toast(&mut self, message: &str, r#type: ToastVariant) {
         self.toast = Some(Toast::new(message, r#type));
+    }
+
+    fn handle_app_error(&mut self, e: AppError) {
+        match e {
+            AppError::ParseStringError(message) => self.show_toast(&message, ToastVariant::Error),
+            AppError::StartNotSet => self.show_toast("Start not set", ToastVariant::Error),
+            AppError::EndNotSet => self.show_toast("End not set", ToastVariant::Error),
+            AppError::InvalidPath => {
+                self.show_toast("Invalid path", ToastVariant::Error);
+            }
+            AppError::FailedRenderFile => {
+                self.show_toast("Failed render file", ToastVariant::Error);
+            }
+            AppError::InvalidAuthCredentials => {
+                self.show_toast("Invalid auth credentials", ToastVariant::Error);
+            }
+        }
     }
 }
