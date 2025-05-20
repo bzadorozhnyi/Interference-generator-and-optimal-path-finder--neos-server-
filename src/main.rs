@@ -1,4 +1,4 @@
-use eframe::egui::{self, Color32};
+use eframe::egui::{self};
 use interference_generator::config::editor::ConfigEditor;
 use interference_generator::error::AppError;
 use interference_generator::neos::api::NeosAPI;
@@ -141,22 +141,7 @@ impl eframe::App for MyApp {
             self.field.draw_filled_cells();
 
             if let Some(toast) = &self.toast {
-                egui::Area::new("toast_area".into())
-                    .anchor(egui::Align2::CENTER_BOTTOM, [0.0, -20.0])
-                    .show(ctx, |ui| {
-                        ui.visuals_mut().override_text_color = Some(Color32::WHITE);
-
-                        let fill_color = match toast.variant {
-                            ToastVariant::Error => Color32::DARK_RED,
-                            ToastVariant::Success => Color32::DARK_GREEN,
-                        };
-
-                        egui::Frame::default()
-                            .fill(fill_color)
-                            .inner_margin(5.0)
-                            .corner_radius(10.0)
-                            .show(ui, |ui| ui.label(&toast.message))
-                    });
+                toast.show(ui);
 
                 if toast.is_expired() {
                     self.toast = None;
