@@ -10,8 +10,6 @@ use interference_generator::{
 };
 
 fn main() -> eframe::Result {
-    dotenvy::dotenv().ok();
-
     let native_options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_inner_size([1280.0, 720.0]),
         ..Default::default()
