@@ -1,6 +1,9 @@
+pub mod cell;
+
 use std::collections::{BTreeMap, HashSet};
 
-use crate::{cell::Cell, error::AppError, re};
+use crate::{error::AppError, re};
+use cell::Cell;
 use eframe::egui::{
     Align2, Color32, FontId, Painter, Pos2, Rect, Response, Sense, Stroke, Ui, Vec2,
 };
@@ -316,7 +319,8 @@ impl Field {
             self.pos2cell(self.pointer_click_pos()),
         ) {
             let cells_touched_by_line = self.bresenham_cells(start_cell, end_cell);
-            self.filled_cells.retain(|x| !cells_touched_by_line.contains(x));
+            self.filled_cells
+                .retain(|x| !cells_touched_by_line.contains(x));
         }
         self.line_segment_start = self.pointer_click_pos();
     }
