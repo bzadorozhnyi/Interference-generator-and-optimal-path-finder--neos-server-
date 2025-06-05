@@ -44,7 +44,7 @@ impl Toast {
 
     pub fn show(&self, ui: &mut Ui) {
         egui::Area::new("toast_area".into())
-            .anchor(egui::Align2::CENTER_TOP, [0.0, 40.0])
+            .anchor(egui::Align2::RIGHT_TOP, [-20.0, 40.0])
             .show(ui.ctx(), |ui| {
                 ui.visuals_mut().override_text_color = Some(Color32::WHITE);
 
