@@ -3,6 +3,7 @@ use interference_generator::config::editor::ConfigEditor;
 use interference_generator::error::AppError;
 use interference_generator::neos::api::NeosAPI;
 use interference_generator::neos::response::NeosResponse;
+use interference_generator::neos::solver::Solver;
 use interference_generator::template::Template;
 use interference_generator::{
     field::Field,
@@ -47,6 +48,7 @@ struct MyApp {
     toast: Option<Toast>,
     neos: NeosAPI,
     neos_output: String,
+    solver: Solver,
     config_editor: ConfigEditor,
 }
 
@@ -59,6 +61,7 @@ impl Default for MyApp {
             toast: None,
             neos: NeosAPI::new(),
             neos_output: String::new(),
+            solver: Solver::Cbc,
             config_editor: ConfigEditor::new(),
         }
     }
@@ -97,10 +100,18 @@ impl eframe::App for MyApp {
                     self.neos.ping();
                 }
 
+                egui::ComboBox::from_label("Solver")
+                    .selected_text(self.solver.name())
+                    .show_ui(ui, |ui| {
+                        for variant in Solver::variants() {
+                            ui.selectable_value(&mut self.solver, *variant, variant.name());
+                        }
+                    });
+
                 if ui.button("Send to NEOS").clicked() {
                     match self
                         .template
-                        .generate_neos_input_string(&self.field, &self.config_editor.config.email)
+                        .generate_neos_input_string(&self.field, &self.solver, &self.config_editor.config.email)
                     {
                         Ok(input) => {
                             self.neos.submit_job(input);
@@ -166,7 +177,7 @@ impl eframe::App for MyApp {
                     NeosResponse::Error(msg) => {
                         self.neos.is_solving_task = false;
                         self.neos.response = msg
-                    },
+                    }
                     NeosResponse::Message(msg) => self.neos.response = msg,
                     NeosResponse::JobCredentials(job_number, job_password) => {
                         self.neos.response = format!(

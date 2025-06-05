@@ -1,6 +1,6 @@
 use tera::Tera;
 
-use crate::{error::AppError, field::Field};
+use crate::{error::AppError, field::Field, neos::solver::Solver};
 
 #[derive(Debug, PartialEq)]
 pub enum Template {
@@ -13,6 +13,7 @@ impl Template {
     pub fn generate_neos_input_string(
         &self,
         field: &Field,
+        solver: &Solver,
         email: &str,
     ) -> Result<String, AppError> {
         let tera = Tera::new("template/*.tera").expect("Failed to load template");
@@ -53,7 +54,7 @@ impl Template {
             "
             <MyProblem>
                 <category>milp</category>
-                <solver>cplex</solver>
+                <solver>{}</solver>
                 <inputType>AMPL</inputType>
                 <priority>long</priority>
                 <email>{}</email>
@@ -65,7 +66,9 @@ impl Template {
                 <comments></comments>
             </MyProblem>
             ",
-            email, code
+            solver.name(),
+            email,
+            code
         );
 
         Ok(xml_input)
