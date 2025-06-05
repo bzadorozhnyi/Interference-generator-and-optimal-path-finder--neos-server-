@@ -4,7 +4,6 @@ pub enum Solver {
     Copt,
     Cplex,
     FicoXpress,
-    Gurobi,
     Highs,
     Minto,
     Mosek,
@@ -16,7 +15,7 @@ impl Solver {
         use Solver::*;
 
         &[
-            Cbc, Copt, Cplex, FicoXpress, Gurobi, Highs, Minto, Mosek, Raposa,
+            Cbc, Copt, Cplex, FicoXpress, Highs, Minto, Mosek, Raposa,
         ]
     }
 
@@ -26,7 +25,6 @@ impl Solver {
             Solver::Copt => "copt",
             Solver::Cplex => "cplex",
             Solver::FicoXpress => "fico-xpress",
-            Solver::Gurobi => "gurobi",
             Solver::Highs => "highs",
             Solver::Minto => "minto",
             Solver::Mosek => "mosek",
