@@ -5,10 +5,7 @@ use interference_generator::neos::api::NeosAPI;
 use interference_generator::neos::response::NeosResponse;
 use interference_generator::neos::solver::Solver;
 use interference_generator::template::Template;
-use interference_generator::{
-    field::Field,
-    toast::{Toast, ToastVariant},
-};
+use interference_generator::{field::Field, toast::Toast};
 
 fn main() -> eframe::Result {
     let native_options = eframe::NativeOptions {
@@ -109,10 +106,11 @@ impl eframe::App for MyApp {
                     });
 
                 if ui.button("Send to NEOS").clicked() {
-                    match self
-                        .template
-                        .generate_neos_input_string(&self.field, &self.solver, &self.config_editor.config.email)
-                    {
+                    match self.template.generate_neos_input_string(
+                        &self.field,
+                        &self.solver,
+                        &self.config_editor.config.email,
+                    ) {
                         Ok(input) => {
                             self.neos.submit_job(input);
                         }
@@ -152,10 +150,10 @@ impl eframe::App for MyApp {
             self.field.draw_filled_cells();
 
             if let Some(toast) = &self.toast {
-                toast.show(ui);
-
                 if toast.is_expired() {
                     self.toast = None;
+                } else {
+                    toast.show(ui);
                 }
             }
 
@@ -202,26 +200,26 @@ impl eframe::App for MyApp {
 }
 
 impl MyApp {
-    fn show_toast(&mut self, message: &str, r#type: ToastVariant) {
-        self.toast = Some(Toast::new(message, r#type));
+    fn show_error(&mut self, message: &str) {
+        self.toast = Some(Toast::error(message));
     }
 
     fn handle_app_error(&mut self, e: AppError) {
         match e {
-            AppError::ParseStringError(message) => self.show_toast(&message, ToastVariant::Error),
-            AppError::StartNotSet => self.show_toast("Start not set", ToastVariant::Error),
-            AppError::EndNotSet => self.show_toast("End not set", ToastVariant::Error),
+            AppError::ParseStringError(message) => self.show_error(&message),
+            AppError::StartNotSet => self.show_error("Start not set"),
+            AppError::EndNotSet => self.show_error("End not set"),
             AppError::InvalidPath => {
-                self.show_toast("Invalid path", ToastVariant::Error);
+                self.show_error("Invalid path");
             }
             AppError::FailedRenderFile => {
-                self.show_toast("Failed render file", ToastVariant::Error);
+                self.show_error("Failed render file");
             }
             AppError::InvalidAuthCredentials => {
-                self.show_toast("Invalid auth credentials", ToastVariant::Error);
+                self.show_error("Invalid auth credentials");
             }
             AppError::FailedUpdateConfig => {
-                self.show_toast("Failed update config", ToastVariant::Error);
+                self.show_error("Failed update config");
             }
         }
     }
