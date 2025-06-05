@@ -40,6 +40,7 @@ param finish :=
 2 {{ end_y }};
 
 solve;
+display _total_solve_time;
 
 printf "\nShortest Path from (%d,%d) to (%d,%d):\n", 
     start[1], start[2], finish[1], finish[2];
