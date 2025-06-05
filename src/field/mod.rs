@@ -53,6 +53,14 @@ impl Field {
             .expect("Field::setup() must be called first!")
     }
 
+    pub fn painter_rect(&self) -> Rect {
+        self.painter().clip_rect()
+    }
+
+    pub fn pixels_per_point(&self) -> f32 {
+        self.painter().pixels_per_point()
+    }
+
     pub fn setup(&mut self, ui: &mut Ui) {
         let desired_size = Vec2::new(
             self.field_size as f32 * self.cell_size,

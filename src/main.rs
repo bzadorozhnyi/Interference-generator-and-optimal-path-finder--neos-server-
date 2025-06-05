@@ -1,6 +1,7 @@
-use eframe::egui::{self};
+use eframe::egui::{self, Ui, UserData};
 use interference_generator::config::editor::ConfigEditor;
 use interference_generator::error::AppError;
+use interference_generator::image_utils::*;
 use interference_generator::neos::api::NeosAPI;
 use interference_generator::neos::response::NeosResponse;
 use interference_generator::neos::solver::Solver;
@@ -47,6 +48,8 @@ struct MyApp {
     neos_output: String,
     solver: Solver,
     config_editor: ConfigEditor,
+    // Use the flag because the screenshot event arrives in the next frame
+    taking_screenshot: bool,
 }
 
 impl Default for MyApp {
@@ -60,6 +63,7 @@ impl Default for MyApp {
             neos_output: String::new(),
             solver: Solver::Cbc,
             config_editor: ConfigEditor::new(),
+            taking_screenshot: false,
         }
     }
 }
@@ -116,6 +120,10 @@ impl eframe::App for MyApp {
                         }
                         Err(e) => self.handle_app_error(e),
                     }
+                }
+
+                if ui.button("Screenshot").clicked() {
+                    self.taking_screenshot = true;
                 }
             });
 
@@ -195,6 +203,12 @@ impl eframe::App for MyApp {
                     }
                 }
             }
+
+            if self.taking_screenshot {
+                if let Err(err) = self.take_screenshot(ui) {
+                    self.handle_app_error(err);
+                }
+            }
         });
     }
 }
@@ -221,6 +235,44 @@ impl MyApp {
             AppError::FailedUpdateConfig => {
                 self.show_error("Failed update config");
             }
+            AppError::FailedTakeScreenshot => {
+                self.show_error("Failed to take screenshot");
+            }
+        }
+    }
+}
+
+impl MyApp {
+    fn take_screenshot(&mut self, ui: &mut Ui) -> Result<(), AppError> {
+        ui.ctx()
+            .send_viewport_cmd(egui::ViewportCommand::Screenshot(UserData::default()));
+
+        let image = ui.ctx().input(|i| {
+            i.events
+                .iter()
+                .filter_map(|e| {
+                    if let egui::Event::Screenshot { image, .. } = e {
+                        Some(image.clone())
+                    } else {
+                        None
+                    }
+                })
+                .last()
+        });
+
+        if let Some(image) = image {
+            self.taking_screenshot = false;
+
+            let image = crop_color_image(
+                &image,
+                self.field.painter_rect(),
+                self.field.pixels_per_point(),
+            )
+            .ok_or(AppError::FailedTakeScreenshot)?;
+
+            save_color_image_to_png("screenshot.png", &image)
+        } else {
+            Ok(())
         }
     }
 }
