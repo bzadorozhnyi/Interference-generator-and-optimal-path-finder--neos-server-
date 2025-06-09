@@ -12,6 +12,11 @@ param finish{1..2} integer;
 
 var x{r in ROWS, c in COLS, nr in ROWS, nc in COLS} binary;
 
+param found;
+param USED_NODES {NODES} binary default 0;
+param ks default 1;
+param Ns default 10;
+
 minimize total_distance:
     sum{r in ROWS, c in COLS,
         (nr,nc) in {(r+1,c), (r-1,c), (r,c+1), (r,c-1),
@@ -36,6 +41,13 @@ subject to disable_nodes {(r,c) in DISABLED_NODES, nr in ROWS, nc in COLS}:
 subject to disable_nodes_reverse {(r,c) in DISABLED_NODES, nr in ROWS, nc in COLS}:
     x[nr,nc,r,c] = 0;
 
+# Prevent reuse of intermediate nodes (not start or finish)
+subject to prevent_reuse {(r,c) in NODES}:
+    (USED_NODES[r,c] = 1 and not (r = start[1] and c = start[2]) and not (r = finish[1] and c = finish[2])) ==> sum{nr in ROWS, nc in COLS} (x[r,c,nr,nc] + x[nr,nc,r,c]) = 0;
+
+problem dka: x, total_distance, flow_balance, disable_nodes, disable_nodes_reverse;
+problem dkb: x, total_distance, flow_balance, disable_nodes, disable_nodes_reverse, prevent_reuse;
+
 data;
 
 param rows := {{ size }};
@@ -52,13 +64,41 @@ param finish :=
 set DISABLED_NODES :=
 {{ disabled_nodes }};
 
-
-solve;
-display _total_solve_time;
+# Initial solve
+solve dka;
 
 printf "\n--- Path 1 ---\n";
-
-for {r in ROWS, c in COLS, nr in ROWS, nc in COLS:
-        x[r,c,nr,nc] > 0.5} {
+for {r in ROWS, c in COLS, nr in ROWS, nc in COLS: x[r,c,nr,nc] > 0.5} {
     printf "  (%d,%d) -> (%d,%d)\n", r, c, nr, nc;
+    let USED_NODES[r,c] := 1;
+    let USED_NODES[nr,nc] := 1;
 }
+
+let ks := 1;
+
+# Loop to find additional paths
+for {k in 2..Ns} {
+    solve dkb;
+
+    if (solve_result != "solved") then {
+        printf "No more disjoint paths found at step %d\n", k;
+        break;
+    }
+
+    printf "\n--- Path %d ---\n", k;
+
+    let found := 0;
+    for {r in ROWS, c in COLS, nr in ROWS, nc in COLS: x[r,c,nr,nc] > 0.5} {
+        printf "  (%d,%d) -> (%d,%d)\n", r, c, nr, nc;
+        let USED_NODES[r,c] := 1;
+        let USED_NODES[nr,nc] := 1;
+        let found := 1;
+    }
+
+    if found = 0 then break;
+
+    let ks := ks + 1;
+}
+
+printf "\nTotal paths found: %d\n", ks;
+display _total_solve_time;

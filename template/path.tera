@@ -42,8 +42,7 @@ param finish :=
 solve;
 display _total_solve_time;
 
-printf "\nShortest Path from (%d,%d) to (%d,%d):\n", 
-    start[1], start[2], finish[1], finish[2];
+printf "\n--- Path 1 ---\n";
 
 for {r in ROWS, c in COLS, nr in ROWS, nc in COLS:
         x[r,c,nr,nc] > 0.5} {

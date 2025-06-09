@@ -84,13 +84,9 @@ impl eframe::App for MyApp {
                 egui::ComboBox::from_label("Template")
                     .selected_text(self.template.name())
                     .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut self.template, Template::Default, "path");
-                        ui.selectable_value(&mut self.template, Template::Eight, "path_8");
-                        ui.selectable_value(
-                            &mut self.template,
-                            Template::Disabled,
-                            "path_disabled",
-                        );
+                        for variant in Template::variants() {
+                            ui.selectable_value(&mut self.template, *variant, variant.name());
+                        }
                     });
 
                 if ui.button("Clear path").clicked() {
@@ -155,7 +151,7 @@ impl eframe::App for MyApp {
                 }
             }
 
-            self.field.draw_filled_cells();
+            self.field.draw();
 
             if let Some(toast) = &self.toast {
                 if toast.is_expired() {
@@ -195,7 +191,7 @@ impl eframe::App for MyApp {
                     }
                     NeosResponse::JobOuput(output) => {
                         self.neos.is_solving_task = false;
-                        match self.field.parse_path(&output) {
+                        match self.field.parse_all_paths(&output) {
                             Ok(_) => {}
                             Err(e) => self.handle_app_error(e),
                         }

@@ -1,8 +1,9 @@
 pub mod cell;
+pub mod path;
 
 use std::collections::{BTreeMap, HashSet};
 
-use crate::{error::AppError, re};
+use crate::{consts::COLORS, error::AppError, field::path::Path, path_parser::all_links};
 use cell::Cell;
 use eframe::egui::{
     Align2, Color32, FontId, Painter, Pos2, Rect, Response, Sense, Stroke, Ui, Vec2,
@@ -15,6 +16,7 @@ pub struct Field {
     pub start_cell: Option<Cell>,
     pub end_cell: Option<Cell>,
     pub path: Option<Vec<Cell>>,
+    pub paths: Option<Vec<Path>>,
     pub line_segment_start: Option<Pos2>,
     response: Option<Response>,
     painter: Option<Painter>,
@@ -29,6 +31,7 @@ impl Default for Field {
             start_cell: None,
             end_cell: None,
             path: None,
+            paths: None,
             line_segment_start: None,
             response: None,
             painter: None,
@@ -77,80 +80,52 @@ impl Field {
         self.field_size as f32 * self.cell_size
     }
 
-    fn parse_coord(&self, name: &str, caps: &regex::Captures) -> Result<usize, AppError> {
-        caps.name(name)
-            .ok_or_else(|| AppError::ParseStringError(format!("Missing field: {}", name)))
-            .and_then(|m| {
-                m.as_str()
-                    .parse::<usize>()
-                    .map_err(|_| AppError::ParseStringError(name.to_string()))
-            })
-    }
-
-    fn parse_cells(&self, row: &str) -> Result<(Cell, Cell), AppError> {
-        let caps = re::PATH_PARSER.captures(row);
-        if let Some(caps) = caps {
-            let first_x = self.parse_coord("first_x", &caps)? - 1;
-            let first_y = self.parse_coord("first_y", &caps)? - 1;
-            let second_x = self.parse_coord("second_x", &caps)? - 1;
-            let second_y = self.parse_coord("second_y", &caps)? - 1;
-
-            let first_cell = Cell::new(first_x, first_y);
-            let second_cell = Cell::new(second_x, second_y);
-
-            Ok((first_cell, second_cell))
-        } else {
-            Err(AppError::ParseStringError(row.to_string()))
-        }
-    }
-
-    pub fn parse_path(&mut self, path: &str) -> Result<(), AppError> {
+    fn path_from_links(&self, links: Vec<(Cell, Cell)>, id: usize) -> Result<Path, AppError> {
         let mut current_cell = match self.start_cell {
             Some(cell) => cell,
             None => return Err(AppError::StartNotSet),
         };
 
-        let end = match self.end_cell {
+        let end_cell = match self.end_cell {
             Some(cell) => cell,
             None => return Err(AppError::EndNotSet),
         };
 
-        let path_cells: Result<Vec<(Cell, Cell)>, AppError> = path
-            .split("\n")
-            .filter(|s| !s.is_empty())
-            .map(|row| self.parse_cells(row))
-            .filter(|x| x.is_ok())
+        let data: BTreeMap<Cell, Cell> = links.into_iter().collect();
+        let mut path = Vec::new();
+
+        while current_cell != end_cell {
+            path.push(current_cell);
+            current_cell = *data.get(&current_cell).ok_or(AppError::InvalidPath)?;
+        }
+        path.push(end_cell);
+
+        Ok(Path::new(path, id))
+    }
+
+    pub fn parse_all_paths(&mut self, output: &str) -> Result<(), AppError> {
+        let (_, links) = all_links(output).map_err(|_| AppError::InvalidPath)?;
+
+        let paths: Result<Vec<Path>, AppError> = links
+            .into_iter()
+            .enumerate()
+            .map(|(index, links)| self.path_from_links(links, index))
             .collect::<Vec<_>>()
             .into_iter()
             .collect();
 
-        let data: BTreeMap<Cell, Cell> = path_cells?.into_iter().collect();
-        let mut path = Vec::new();
-
-        while current_cell != end {
-            path.push(current_cell);
-            current_cell = *data.get(&current_cell).ok_or(AppError::InvalidPath)?;
-        }
-        path.push(end);
-
-        self.path = Some(path);
+        self.paths = Some(paths?);
 
         Ok(())
     }
 
-    pub fn draw_path(&self) {
-        let path = match &self.path {
-            Some(path) => path,
-            None => {
-                return;
-            }
-        };
-
-        path.windows(2).for_each(|w| {
+    pub fn draw_path(&self, path: &Path) {
+        path.cells().windows(2).for_each(|w| {
             let [prev_cell, next_cell] = w else { return };
+            let color = COLORS[path.id % COLORS.len()];
             self.painter().line(
                 vec![self.cell2pos2(prev_cell), self.cell2pos2(next_cell)],
-                Stroke::new(4.0, Color32::PURPLE),
+                Stroke::new(4.0, color),
             );
         });
     }
@@ -164,10 +139,10 @@ impl Field {
         Pos2::new(x, y)
     }
 
-    pub fn draw_filled_cells(&self) {
+    pub fn draw(&self) {
         self.draw_field();
 
-        self.draw_path();
+        self.draw_paths();
 
         self.draw_endpoint(&self.start_cell, "S", Color32::RED);
         self.draw_endpoint(&self.end_cell, "T", Color32::ORANGE);
@@ -193,6 +168,14 @@ impl Field {
                     Stroke::new(1.0, Color32::GRAY),
                     eframe::egui::StrokeKind::Inside,
                 );
+            }
+        }
+    }
+
+    fn draw_paths(&self) {
+        if let Some(paths) = &self.paths {
+            for path in paths {
+                self.draw_path(path);
             }
         }
     }

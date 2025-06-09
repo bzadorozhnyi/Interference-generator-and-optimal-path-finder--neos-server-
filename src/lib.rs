@@ -4,6 +4,6 @@ pub mod error;
 pub mod field;
 pub mod image_utils;
 pub mod neos;
-pub mod re;
+pub mod path_parser; 
 pub mod template;
 pub mod toast;

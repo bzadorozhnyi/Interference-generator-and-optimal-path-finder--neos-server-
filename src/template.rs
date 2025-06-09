@@ -2,14 +2,22 @@ use tera::Tera;
 
 use crate::{error::AppError, field::Field, neos::solver::Solver};
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Template {
     Default,
     Eight,
     Disabled,
+    Multiple,
 }
 
 impl Template {
+    pub fn variants() -> &'static [Template] {
+        use Template::*;
+
+        &[Default, Eight, Disabled, Multiple]
+    }
+
     pub fn generate_neos_input_string(
         &self,
         field: &Field,
@@ -47,7 +55,7 @@ impl Template {
         );
 
         let code = tera
-            .render(self.name(), &context)
+            .render(&format!("{}.tera", self.name()), &context)
             .map_err(|_| AppError::FailedRenderFile)?;
 
         let xml_input = format!(
@@ -76,9 +84,10 @@ impl Template {
 
     pub fn name(&self) -> &str {
         match self {
-            Template::Default => "path.tera",
-            Template::Eight => "path_8.tera",
-            Template::Disabled => "path_disabled.tera",
+            Template::Default => "path",
+            Template::Eight => "path_8",
+            Template::Disabled => "path_disabled",
+            Template::Multiple => "path_multiple",
         }
     }
 }
