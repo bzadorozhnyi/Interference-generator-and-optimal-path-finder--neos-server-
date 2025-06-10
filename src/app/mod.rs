@@ -5,7 +5,7 @@ use eframe::egui::{self, Ui, UserData};
 use crate::app::mode::Mode;
 use crate::config::editor::ConfigEditor;
 use crate::error::AppError;
-use crate::image_utils::*;
+use crate::utils::image::*;
 use crate::neos::api::NeosAPI;
 use crate::neos::response::NeosResponse;
 use crate::neos::solver::Solver;
