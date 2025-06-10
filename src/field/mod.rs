@@ -14,7 +14,8 @@ use eframe::egui::{
 };
 
 pub struct Field {
-    pub field_size: usize,
+    pub width: usize,
+    pub height: usize,
     cell_size: f32,
     pub filled_cells: HashSet<Cell>,
     pub start_cell: Option<Cell>,
@@ -28,7 +29,8 @@ pub struct Field {
 impl Default for Field {
     fn default() -> Self {
         Self {
-            field_size: 30,
+            width: 40,
+            height: 20,
             cell_size: 20.0,
             filled_cells: HashSet::new(),
             start_cell: None,
@@ -68,8 +70,8 @@ impl Field {
 
     pub fn setup(&mut self, ui: &mut Ui) {
         let desired_size = Vec2::new(
-            self.field_size as f32 * self.cell_size,
-            self.field_size as f32 * self.cell_size,
+            self.width as f32 * self.cell_size,
+            self.height as f32 * self.cell_size,
         );
 
         let (response, painter) = ui.allocate_painter(desired_size, Sense::click_and_drag());
@@ -78,8 +80,8 @@ impl Field {
         self.painter = Some(painter);
     }
 
-    pub fn size(&self) -> f32 {
-        self.field_size as f32 * self.cell_size
+    pub fn area_height(&self) -> f32 {
+        self.height as f32 * self.cell_size
     }
 
     fn path_from_links(&self, links: Vec<(Cell, Cell)>, id: usize) -> Result<Path, AppError> {
@@ -160,8 +162,8 @@ impl Field {
     }
 
     fn draw_field(&self) {
-        for x in 0..self.field_size {
-            for y in 0..self.field_size {
+        for x in 0..self.width {
+            for y in 0..self.height {
                 let current_cell = Cell::new(x, y);
 
                 let color = if self.filled_cells.contains(&current_cell) {
@@ -241,7 +243,7 @@ impl Field {
                 let x = ((pos.x - field_rect.left()) / self.cell_size).floor() as usize;
                 let y = ((pos.y - field_rect.top()) / self.cell_size).floor() as usize;
 
-                if x < self.field_size && y < self.field_size {
+                if x < self.width && y < self.height {
                     Some(Cell::new(x, y))
                 } else {
                     None

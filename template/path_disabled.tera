@@ -37,8 +37,8 @@ subject to disable_nodes_reverse {(r,c) in DISABLED_NODES, nr in ROWS, nc in COL
 
 data;
 
-param rows := {{ size }};
-param cols := {{ size }};
+param rows := {{ width }};
+param cols := {{ height }};
 
 param start :=
 1 {{ start_x }}

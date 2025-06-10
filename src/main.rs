@@ -10,7 +10,7 @@ use interference_generator::{field::Field, toast::Toast};
 
 fn main() -> eframe::Result {
     let native_options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_inner_size([1280.0, 720.0]),
+        viewport: egui::ViewportBuilder::default().with_inner_size([1280.0, 520.0]),
         ..Default::default()
     };
 
@@ -125,20 +125,22 @@ impl eframe::App for MyApp {
 
             ui.add_space(20.0);
 
-            ui.columns(2, |columns| {
-                self.field.setup(&mut columns[0]);
+            ui.horizontal(|ui| {
+                self.field.setup(ui);
 
                 if self.neos.is_solving_task {
-                    columns[1].horizontal(|ui| {
+                    ui.horizontal(|ui| {
                         ui.spinner();
                         ui.label("Solving task");
                     });
                 } else {
-                    egui::ScrollArea::vertical()
-                        .max_height(self.field.size())
-                        .show(&mut columns[1], |ui| {
-                            ui.label(&self.neos_output);
-                        });
+                    ui.vertical(|ui| {
+                        egui::ScrollArea::vertical()
+                            .max_height(self.field.area_height())
+                            .show(ui, |ui| {
+                                ui.label(&self.neos_output);
+                            });
+                    });
                 }
             });
 

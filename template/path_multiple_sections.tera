@@ -52,8 +52,8 @@ problem dkb: x, total_distance, flow_balance, disable_nodes, disable_nodes_rever
 
 data;
 
-param rows := {{ size }};
-param cols := {{ size }};
+param rows := {{ width }};
+param cols := {{ height }};
 
 param start :=
 1 {{ start_x }}

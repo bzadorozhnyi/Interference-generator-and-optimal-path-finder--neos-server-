@@ -28,8 +28,8 @@ subject to flow_balance {r in ROWS, c in COLS}:
 
 data;
 
-param rows := {{ size }};
-param cols := {{ size }};
+param rows := {{ width }};
+param cols := {{ height }};
 
 param start :=
 1 {{ start_x }}

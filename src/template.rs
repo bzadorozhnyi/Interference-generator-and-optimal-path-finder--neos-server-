@@ -37,7 +37,8 @@ impl Template {
 
         let mut context = tera::Context::new();
 
-        context.insert("size", &field.field_size);
+        context.insert("width", &field.width);
+        context.insert("height", &field.height);
 
         if field.start_cell.is_none() {
             return Err(AppError::StartNotSet);
