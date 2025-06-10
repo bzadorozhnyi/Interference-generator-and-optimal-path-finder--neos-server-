@@ -1,5 +1,5 @@
 use eframe::egui::{self};
-use interference_generator::app::MyApp;
+use interference_generator::app::App;
 
 fn main() -> eframe::Result {
     let native_options = eframe::NativeOptions {
@@ -19,6 +19,6 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "Interference generator",
         native_options,
-        Box::new(|_cc| Ok(Box::<MyApp>::default())),
+        Box::new(|_cc| Ok(Box::<App>::default())),
     )
 }

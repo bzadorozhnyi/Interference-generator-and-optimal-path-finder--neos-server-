@@ -12,7 +12,7 @@ use crate::neos::solver::Solver;
 use crate::template::Template;
 use crate::{field::Field, toast::Toast};
 
-pub struct MyApp {
+pub struct App {
     field: Field,
     mode: Mode,
     template: Template,
@@ -25,7 +25,7 @@ pub struct MyApp {
     taking_screenshot: bool,
 }
 
-impl Default for MyApp {
+impl Default for App {
     fn default() -> Self {
         Self {
             field: Field::new(),
@@ -41,7 +41,7 @@ impl Default for MyApp {
     }
 }
 
-impl eframe::App for MyApp {
+impl eframe::App for App {
     fn update(&mut self, ctx: &eframe::egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
             egui::menu::bar(ui, |ui| {
@@ -184,7 +184,7 @@ impl eframe::App for MyApp {
     }
 }
 
-impl MyApp {
+impl App {
     fn show_error(&mut self, message: &str) {
         self.toast = Some(Toast::error(message));
     }
@@ -213,7 +213,7 @@ impl MyApp {
     }
 }
 
-impl MyApp {
+impl App {
     fn take_screenshot(&mut self, ui: &mut Ui) -> Result<(), AppError> {
         ui.ctx()
             .send_viewport_cmd(egui::ViewportCommand::Screenshot(UserData::default()));
