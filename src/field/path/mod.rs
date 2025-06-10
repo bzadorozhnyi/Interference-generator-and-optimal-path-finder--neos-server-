@@ -1,4 +1,8 @@
+pub mod parser;
+
 use crate::field::cell::Cell;
+
+pub use parser::parse_neos_output;
 
 #[derive(Debug)]
 pub struct Path {

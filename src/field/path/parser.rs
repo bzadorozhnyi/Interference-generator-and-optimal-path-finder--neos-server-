@@ -26,7 +26,7 @@ fn cell(input: &str) -> IResult<&str, Cell> {
             separated_pair(number, char(','), number),
             tag(")"),
         ),
-        |(x, y)| Cell::new((x - 1) as usize, (y - 1) as usize),
+        |(x, y)| Cell::new(x as usize, y as usize),
     )
     .parse(input)
 }
@@ -62,7 +62,7 @@ fn skip_until_path(input: &str) -> IResult<&str, &str> {
     take_until(PATH_START_PATTERN).parse(input)
 }
 
-pub fn all_links(mut input: &str) -> IResult<&str, Vec<Vec<Link>>> {
+pub fn parse_neos_output(mut input: &str) -> IResult<&str, Vec<Vec<Link>>> {
     let mut paths = Vec::new();
 
     while let Ok((i, _)) = skip_until_path(input) {

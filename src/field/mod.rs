@@ -3,7 +3,11 @@ pub mod path;
 
 use std::collections::{BTreeMap, HashSet};
 
-use crate::{consts::COLORS, error::AppError, field::path::Path, path_parser::all_links};
+use crate::{
+    consts::COLORS,
+    error::AppError,
+    field::path::{parse_neos_output, Path},
+};
 use cell::Cell;
 use eframe::egui::{
     Align2, Color32, FontId, Painter, Pos2, Rect, Response, Sense, Stroke, Ui, Vec2,
@@ -102,7 +106,14 @@ impl Field {
     }
 
     pub fn parse_all_paths(&mut self, output: &str) -> Result<(), AppError> {
-        let (_, links) = all_links(output).map_err(|_| AppError::InvalidPath)?;
+        let (_, mut links) = parse_neos_output(output).map_err(|_| AppError::InvalidPath)?;
+
+        for link in &mut links {
+            for (a, b) in link {
+                a.to_zero_indexed();
+                b.to_zero_indexed();
+            }
+        }
 
         let paths: Result<Vec<Path>, AppError> = links
             .into_iter()
