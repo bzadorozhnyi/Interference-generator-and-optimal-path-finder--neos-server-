@@ -9,13 +9,22 @@ pub enum Template {
     Eight,
     Disabled,
     Multiple,
+    MultipleSections,
+    MultipleSeparated,
 }
 
 impl Template {
     pub fn variants() -> &'static [Template] {
         use Template::*;
 
-        &[Default, Eight, Disabled, Multiple]
+        &[
+            Default,
+            Eight,
+            Disabled,
+            Multiple,
+            MultipleSections,
+            MultipleSeparated,
+        ]
     }
 
     pub fn generate_neos_input_string(
@@ -88,6 +97,8 @@ impl Template {
             Template::Eight => "path_8",
             Template::Disabled => "path_disabled",
             Template::Multiple => "path_multiple",
+            Template::MultipleSections => "path_multiple_sections",
+            Template::MultipleSeparated => "path_multiple_separated",
         }
     }
 }

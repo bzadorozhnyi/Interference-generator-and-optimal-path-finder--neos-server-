@@ -89,8 +89,8 @@ impl eframe::App for MyApp {
                         }
                     });
 
-                if ui.button("Clear path").clicked() {
-                    self.field.clear_path();
+                if ui.button("Clear paths").clicked() {
+                    self.field.clear_paths();
                 }
 
                 if ui.button("Ping NEOS").clicked() {

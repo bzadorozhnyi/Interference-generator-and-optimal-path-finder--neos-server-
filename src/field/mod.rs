@@ -15,7 +15,6 @@ pub struct Field {
     pub filled_cells: HashSet<Cell>,
     pub start_cell: Option<Cell>,
     pub end_cell: Option<Cell>,
-    pub path: Option<Vec<Cell>>,
     pub paths: Option<Vec<Path>>,
     pub line_segment_start: Option<Pos2>,
     response: Option<Response>,
@@ -30,7 +29,6 @@ impl Default for Field {
             filled_cells: HashSet::new(),
             start_cell: None,
             end_cell: None,
-            path: None,
             paths: None,
             line_segment_start: None,
             response: None,
@@ -332,7 +330,7 @@ impl Field {
         }
     }
 
-    pub fn clear_path(&mut self) {
-        self.path = None;
+    pub fn clear_paths(&mut self) {
+        self.paths = None;
     }
 }
