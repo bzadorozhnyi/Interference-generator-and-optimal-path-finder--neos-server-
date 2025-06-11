@@ -153,7 +153,7 @@ impl eframe::App for App {
                 match neos_response {
                     NeosResponse::Error(msg) => {
                         self.neos.is_solving_task = false;
-                        self.neos.response = msg
+                        self.show_error(&msg);
                     }
                     NeosResponse::Message(msg) => self.neos.response = msg,
                     NeosResponse::JobCredentials(job_number, job_password) => {
