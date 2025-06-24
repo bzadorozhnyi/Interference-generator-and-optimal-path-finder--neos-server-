@@ -1,15 +1,15 @@
 mod mode;
 
-use eframe::egui::{self, Ui, UserData};
+use eframe::egui::{self, DragValue, Ui, UserData};
 
 use crate::app::mode::Mode;
 use crate::config::editor::ConfigEditor;
 use crate::error::AppError;
-use crate::utils::image::*;
 use crate::neos::api::NeosAPI;
 use crate::neos::response::NeosResponse;
 use crate::neos::solver::Solver;
 use crate::template::Template;
+use crate::utils::image::*;
 use crate::{field::Field, toast::Toast};
 
 pub struct App {
@@ -61,6 +61,15 @@ impl eframe::App for App {
                             ui.selectable_value(&mut self.template, *variant, variant.name());
                         }
                     });
+
+                if let Template::TurnCost(value) = &mut self.template {
+                    ui.add(
+                        DragValue::new(value)
+                            .range(0..=10)
+                            .speed(1.0)
+                            .suffix(" Turn cost"),
+                    );
+                }
 
                 if ui.button("Clear paths").clicked() {
                     self.field.clear_paths();

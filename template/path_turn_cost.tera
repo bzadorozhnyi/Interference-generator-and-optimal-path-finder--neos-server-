@@ -1,0 +1,121 @@
+param rows integer > 0;
+param cols integer > 0;
+
+set ROWS := 1..rows;
+set COLS := 1..cols;
+
+set NODES := {ROWS, COLS};
+set DISABLED_NODES within NODES default {};
+
+param start{1..2} integer;
+param finish{1..2} integer;
+
+set DIR := 1..8;
+param DR{DIR};
+param DC{DIR};
+
+param turn_weight{DIR, DIR} default 0;
+
+param max_turn_cost >= 0 default 10;
+
+var x{r in ROWS, c in COLS, nr in ROWS, nc in COLS} binary;
+var z{r in ROWS, c in COLS, d1 in DIR, d2 in DIR} binary;
+
+minimize total_distance:
+    sum{r in ROWS, c in COLS,
+        (nr,nc) in {(r+1,c), (r-1,c), (r,c+1), (r,c-1),
+                    (r+1,c+1), (r+1,c-1), (r-1,c+1), (r-1,c-1)}:
+        nr >= 1 and nr <= rows and nc >= 1 and nc <= cols
+        and (r,c) not in DISABLED_NODES and (nr,nc) not in DISABLED_NODES}
+        x[r,c,nr,nc];
+
+subject to flow_balance {r in ROWS, c in COLS: (r,c) not in DISABLED_NODES}:
+    sum{(nr,nc) in {(r+1,c),(r-1,c),(r,c+1),(r,c-1),
+                    (r+1,c+1),(r+1,c-1),(r-1,c+1),(r-1,c-1)}:
+        nr >= 1 and nr <= rows and nc >= 1 and nc <= cols}
+        (x[r,c,nr,nc] - x[nr,nc,r,c])
+    =
+    if (r = start[1] and c = start[2]) then 1
+    else if (r = finish[1] and c = finish[2]) then -1
+    else 0;
+
+subject to disable_nodes {(r,c) in DISABLED_NODES, nr in ROWS, nc in COLS}:
+    x[r,c,nr,nc] = 0;
+
+subject to disable_nodes_reverse {(r,c) in DISABLED_NODES, nr in ROWS, nc in COLS}:
+    x[nr,nc,r,c] = 0;
+
+subject to change_detection {
+    r in ROWS, c in COLS,
+    d1 in DIR, d2 in DIR :
+    r+DR[d1] in ROWS and c+DC[d1] in COLS and
+    r+DR[d1]+DR[d2] in ROWS and c+DC[d1]+DC[d2] in COLS and
+    (r,c) not in DISABLED_NODES and
+    (r+DR[d1],c+DC[d1]) not in DISABLED_NODES and
+    (r+DR[d1]+DR[d2],c+DC[d1]+DC[d2]) not in DISABLED_NODES
+}:
+    z[r,c,d1,d2] >= 
+        x[r,c,r+DR[d1],c+DC[d1]] +
+        x[r+DR[d1],c+DC[d1],r+DR[d1]+DR[d2],c+DC[d1]+DC[d2]] - 1;
+
+subject to limit_total_turn_cost:
+    sum{r in ROWS, c in COLS, d1 in DIR, d2 in DIR}
+        turn_weight[d1,d2] * z[r,c,d1,d2]
+    <= max_turn_cost;
+
+data;
+
+param rows := {{ width }};
+param cols := {{ height }};
+
+param start :=
+1 {{ start_x }}
+2 {{ start_y }};
+
+param finish :=
+1 {{ end_x }}
+2 {{ end_y }};
+
+set DISABLED_NODES :=
+{{ disabled_nodes }};
+
+param DR :=
+1 -1
+2 0
+3 1
+4 1
+5 1
+6 0
+7 -1
+8 -1;
+
+param DC :=
+1 1
+2 1
+3 1
+4 0
+5 -1
+6 -1
+7 -1
+8 0;
+
+param turn_weight :=
+  [*,*] :  1   2   3   4   5   6   7   8 :=
+      1   0   1   2   3   2   1   1   1
+      2   1   0   1   2   3   2   1   1
+      3   2   1   0   1   2   3   2   1
+      4   3   2   1   0   1   2   3   2
+      5   2   3   2   1   0   1   2   3
+      6   1   2   3   2   1   0   1   2
+      7   1   1   2   3   2   1   0   1
+      8   1   1   1   2   3   2   1   0 ;
+
+param max_turn_cost := {{ turn_cost }};
+
+solve;
+
+printf "\n--- Path 1 ---\n";
+for {r in ROWS, c in COLS, nr in ROWS, nc in COLS:
+        x[r,c,nr,nc] > 0.5} {
+    printf "  (%d,%d) -> (%d,%d)\n", r, c, nr, nc;
+}

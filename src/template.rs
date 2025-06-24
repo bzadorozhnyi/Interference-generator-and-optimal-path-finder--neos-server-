@@ -11,7 +11,8 @@ pub enum Template {
     Multiple,
     MultipleSections,
     MultipleSeparated,
-    CornerCutting
+    CornerCutting,
+    TurnCost(u32),
 }
 
 impl Template {
@@ -25,7 +26,8 @@ impl Template {
             Multiple,
             MultipleSections,
             MultipleSeparated,
-            CornerCutting
+            CornerCutting,
+            TurnCost(0),
         ]
     }
 
@@ -55,6 +57,10 @@ impl Template {
 
         context.insert("end_x", &(field.end_cell.as_ref().unwrap().x + 1));
         context.insert("end_y", &(field.end_cell.as_ref().unwrap().y + 1));
+
+        if let Template::TurnCost(turn_cost) = self {
+            context.insert("turn_cost", turn_cost);
+        }
 
         context.insert(
             "disabled_nodes",
@@ -103,6 +109,7 @@ impl Template {
             Template::MultipleSections => "path_multiple_sections",
             Template::MultipleSeparated => "path_multiple_separated",
             Template::CornerCutting => "path_corner_cutting",
+            Template::TurnCost(_) => "path_turn_cost",
         }
     }
 }
