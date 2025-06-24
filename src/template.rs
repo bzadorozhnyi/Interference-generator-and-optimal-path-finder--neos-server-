@@ -11,6 +11,7 @@ pub enum Template {
     Multiple,
     MultipleSections,
     MultipleSeparated,
+    CornerCutting
 }
 
 impl Template {
@@ -24,6 +25,7 @@ impl Template {
             Multiple,
             MultipleSections,
             MultipleSeparated,
+            CornerCutting
         ]
     }
 
@@ -100,6 +102,7 @@ impl Template {
             Template::Multiple => "path_multiple",
             Template::MultipleSections => "path_multiple_sections",
             Template::MultipleSeparated => "path_multiple_separated",
+            Template::CornerCutting => "path_corner_cutting",
         }
     }
 }
