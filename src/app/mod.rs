@@ -188,6 +188,9 @@ impl eframe::App for App {
                 if let Err(err) = self.take_screenshot(ui) {
                     self.handle_app_error(err);
                 }
+                else {
+                    self.show_success("Screenshot taken successfully");
+                }
             }
         });
     }
@@ -196,6 +199,10 @@ impl eframe::App for App {
 impl App {
     fn show_error(&mut self, message: &str) {
         self.toast = Some(Toast::error(message));
+    }
+
+    fn show_success(&mut self, message: &str) {
+        self.toast = Some(Toast::success(message));
     }
 
     fn handle_app_error(&mut self, e: AppError) {
