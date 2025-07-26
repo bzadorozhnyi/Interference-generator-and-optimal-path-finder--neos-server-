@@ -63,11 +63,11 @@ impl Template {
             return Err(AppError::EndNotSet);
         }
 
-        context.insert("start_x", &(field.start_cell.as_ref().unwrap().x + 1));
-        context.insert("start_y", &(field.start_cell.as_ref().unwrap().y + 1));
+        context.insert("start_x", &(field.start_cell.as_ref().unwrap().x));
+        context.insert("start_y", &(field.start_cell.as_ref().unwrap().y));
 
-        context.insert("end_x", &(field.end_cell.as_ref().unwrap().x + 1));
-        context.insert("end_y", &(field.end_cell.as_ref().unwrap().y + 1));
+        context.insert("end_x", &(field.end_cell.as_ref().unwrap().x));
+        context.insert("end_y", &(field.end_cell.as_ref().unwrap().y));
 
         // pink constraints info
         let pink_pair_range: Vec<usize> = (1..=(field.pink_pair_map.len() / 2)).collect();
@@ -86,7 +86,7 @@ impl Template {
                 .filled_cells
                 .iter()
                 .filter(|(_, cell_type)| cell_type != &&CellType::Pink)
-                .map(|(cell, _)| format!("({},{})", cell.x + 1, cell.y + 1))
+                .map(|(cell, _)| format!("({},{})", cell.x, cell.y))
                 .collect::<Vec<_>>()
                 .join(" "),
         );
@@ -147,7 +147,7 @@ fn prepare_pink_params(pink_pairs: HashSet<(&Cell, &Cell)>) -> Vec<PinkPairParam
     let mut counter = 1;
 
     for (a, b) in pink_pairs {
-        let values = vec![1, a.x + 1, 2, a.y + 1, 3, b.x + 1, 4, b.y + 1];
+        let values = vec![1, a.x, 2, a.y, 3, b.x, 4, b.y];
         result.push(PinkPairParam {
             name: format!("pink_pair{}", counter),
             values,

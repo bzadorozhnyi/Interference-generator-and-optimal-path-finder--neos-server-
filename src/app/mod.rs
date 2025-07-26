@@ -130,7 +130,7 @@ impl eframe::App for App {
 
             match self.field.hovered_cell() {
                 Some(cell) => {
-                    ui.label(format!("Cell: (x: {}, y: {})", cell.x + 1, cell.y + 1));
+                    ui.label(format!("Cell: (x: {}, y: {})", cell.x, cell.y));
                 }
                 None => {
                     ui.label("Cell: None");

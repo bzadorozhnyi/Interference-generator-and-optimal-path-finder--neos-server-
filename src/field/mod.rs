@@ -113,14 +113,7 @@ impl Field {
     }
 
     pub fn parse_all_paths(&mut self, output: &str) -> Result<(), AppError> {
-        let (_, mut links) = parse_neos_output(output).map_err(|_| AppError::InvalidPath)?;
-
-        for link in &mut links {
-            for (a, b) in link {
-                a.to_zero_indexed();
-                b.to_zero_indexed();
-            }
-        }
+        let (_, links) = parse_neos_output(output).map_err(|_| AppError::InvalidPath)?;
 
         let paths: Result<Vec<Path>, AppError> = links
             .into_iter()
@@ -149,10 +142,10 @@ impl Field {
     fn cell2pos2(&self, cell: &Cell) -> Pos2 {
         let field_rect = self.response().rect;
 
-        let x = field_rect.left() + cell.x as f32 * self.cell_size + self.cell_size / 2.0;
-        let y = field_rect.top() + cell.y as f32 * self.cell_size + self.cell_size / 2.0;
-
-        Pos2::new(x, y)
+        Pos2::new(
+            field_rect.left() + (cell.x - 1) as f32 * self.cell_size + self.cell_size / 2.0,
+            field_rect.top() + (cell.y - 1) as f32 * self.cell_size + self.cell_size / 2.0,
+        )
     }
 
     pub fn draw(&self) {
@@ -167,8 +160,8 @@ impl Field {
     }
 
     fn draw_field(&self) {
-        for x in 0..self.width {
-            for y in 0..self.height {
+        for x in 1..=self.width {
+            for y in 1..=self.height {
                 let current_cell = Cell::new(x, y);
 
                 let color = match self.filled_cells.get(&current_cell) {
@@ -199,13 +192,8 @@ impl Field {
     }
 
     fn draw_endpoint(&self, cell: &Option<Cell>, label: &str, color: Color32) {
-        let field_rect = self.response().rect;
-
         if let Some(cell) = cell {
-            let end_pos = Pos2::new(
-                field_rect.left() + cell.x as f32 * self.cell_size + self.cell_size / 2.0,
-                field_rect.top() + cell.y as f32 * self.cell_size + self.cell_size / 2.0,
-            );
+            let end_pos = self.cell2pos2(cell);
             self.painter()
                 .circle(end_pos, self.cell_size / 2.0, color, Stroke::NONE);
             self.painter().text(
@@ -234,8 +222,8 @@ impl Field {
         let field_rect = self.response().rect;
 
         let cell_min = Pos2::new(
-            field_rect.left() + cell.x as f32 * self.cell_size,
-            field_rect.top() + cell.y as f32 * self.cell_size,
+            field_rect.left() + (cell.x - 1) as f32 * self.cell_size,
+            field_rect.top() + (cell.y - 1) as f32 * self.cell_size,
         );
         let cell_max = Pos2::new(cell_min.x + self.cell_size, cell_min.y + self.cell_size);
 
@@ -247,10 +235,10 @@ impl Field {
             Some(pos) => {
                 let field_rect = self.response().rect;
 
-                let x = ((pos.x - field_rect.left()) / self.cell_size).floor() as usize;
-                let y = ((pos.y - field_rect.top()) / self.cell_size).floor() as usize;
+                let x = ((pos.x - field_rect.left()) / self.cell_size).floor() as usize + 1;
+                let y = ((pos.y - field_rect.top()) / self.cell_size).floor() as usize + 1;
 
-                if x < self.width && y < self.height {
+                if x <= self.width && y <= self.height {
                     Some(Cell::new(x, y))
                 } else {
                     None
@@ -382,7 +370,7 @@ impl Field {
     }
 
     pub fn contains(&self, cell: &Cell) -> bool {
-        0 < cell.x && cell.x < self.width && 0 < cell.y && cell.y < self.height
+        1 <= cell.x && cell.x <= self.width && 1 <= cell.y && cell.y <= self.height
     }
 
     /// If the given cell and its diagonal opposite form a valid pink pattern,
