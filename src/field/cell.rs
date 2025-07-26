@@ -14,3 +14,9 @@ impl Cell {
         self.y -= 1;
     }
 }
+
+#[derive(Hash, PartialEq, Eq)]
+pub enum CellType {
+    Green,
+    Pink,
+}

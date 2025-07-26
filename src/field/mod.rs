@@ -1,12 +1,15 @@
 pub mod cell;
 pub mod path;
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::{
     consts::COLORS,
     error::AppError,
-    field::path::{parse_neos_output, Path},
+    field::{
+        cell::CellType,
+        path::{parse_neos_output, Path},
+    },
 };
 use cell::Cell;
 use eframe::egui::{
@@ -17,7 +20,7 @@ pub struct Field {
     pub width: usize,
     pub height: usize,
     cell_size: f32,
-    pub filled_cells: HashSet<Cell>,
+    pub filled_cells: HashMap<Cell, CellType>,
     pub start_cell: Option<Cell>,
     pub end_cell: Option<Cell>,
     pub paths: Option<Vec<Path>>,
@@ -32,7 +35,7 @@ impl Default for Field {
             width: 40,
             height: 20,
             cell_size: 20.0,
-            filled_cells: HashSet::new(),
+            filled_cells: HashMap::new(),
             start_cell: None,
             end_cell: None,
             paths: None,
@@ -166,7 +169,7 @@ impl Field {
             for y in 0..self.height {
                 let current_cell = Cell::new(x, y);
 
-                let color = if self.filled_cells.contains(&current_cell) {
+                let color = if self.filled_cells.contains_key(&current_cell) {
                     Color32::DARK_GREEN
                 } else {
                     Color32::LIGHT_GRAY
@@ -310,7 +313,11 @@ impl Field {
             self.pos2cell(self.pointer_click_pos()),
         ) {
             let cells_touched_by_line = self.bresenham_cells(start_cell, end_cell);
-            self.filled_cells.extend(cells_touched_by_line);
+            self.filled_cells.extend(
+                cells_touched_by_line
+                    .into_iter()
+                    .map(|c| (c, CellType::Green)),
+            );
         }
         self.line_segment_start = self.pointer_click_pos();
     }
@@ -322,14 +329,14 @@ impl Field {
         ) {
             let cells_touched_by_line = self.bresenham_cells(start_cell, end_cell);
             self.filled_cells
-                .retain(|x| !cells_touched_by_line.contains(x));
+                .retain(|x, _| !cells_touched_by_line.contains(x));
         }
         self.line_segment_start = self.pointer_click_pos();
     }
 
     pub fn handle_start_cell_selection(&mut self) {
         if let Some(cell) = self.clicked_cell() {
-            if !self.filled_cells.contains(&cell) {
+            if !self.filled_cells.contains_key(&cell) {
                 self.start_cell = Some(cell)
             }
         }
@@ -337,7 +344,7 @@ impl Field {
 
     pub fn handle_end_cell_selection(&mut self) {
         if let Some(cell) = self.clicked_cell() {
-            if !self.filled_cells.contains(&cell) {
+            if !self.filled_cells.contains_key(&cell) {
                 self.end_cell = Some(cell)
             }
         }

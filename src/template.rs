@@ -67,7 +67,7 @@ impl Template {
             &field
                 .filled_cells
                 .iter()
-                .map(|c| format!("({},{})", c.x + 1, c.y + 1))
+                .map(|(cell, _)| format!("({},{})", cell.x + 1, cell.y + 1))
                 .collect::<Vec<_>>()
                 .join(" "),
         );
