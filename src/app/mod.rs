@@ -51,6 +51,8 @@ impl eframe::App for App {
 
                 ui.selectable_value(&mut self.mode, Mode::Draw, "Draw");
                 ui.selectable_value(&mut self.mode, Mode::Erase, "Erase");
+                ui.selectable_value(&mut self.mode, Mode::AddPinkConstraint, "Add pink");
+                ui.selectable_value(&mut self.mode, Mode::RemovePinkConstraint, "Remove pink");
                 ui.selectable_value(&mut self.mode, Mode::StartSelection, "Start");
                 ui.selectable_value(&mut self.mode, Mode::EndSelection, "Terminal");
 
@@ -156,6 +158,8 @@ impl eframe::App for App {
                 Mode::Erase => self.field.handle_removing_cells(),
                 Mode::StartSelection => self.field.handle_start_cell_selection(),
                 Mode::EndSelection => self.field.handle_end_cell_selection(),
+                Mode::AddPinkConstraint => self.field.handle_add_pink_pair_constraint(),
+                Mode::RemovePinkConstraint => self.field.handle_remove_pink_pair_constraint(),
             }
 
             if let Ok(neos_response) = self.neos.rx.try_recv() {
@@ -187,8 +191,7 @@ impl eframe::App for App {
             if self.taking_screenshot {
                 if let Err(err) = self.take_screenshot(ui) {
                     self.handle_app_error(err);
-                }
-                else {
+                } else {
                     self.show_success("Screenshot taken successfully");
                 }
             }

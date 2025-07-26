@@ -1,6 +1,15 @@
+use std::collections::HashSet;
+
 use tera::Tera;
 
-use crate::{error::AppError, field::Field, neos::solver::Solver};
+use crate::{
+    error::AppError,
+    field::{
+        cell::{Cell, CellType},
+        Field,
+    },
+    neos::solver::Solver,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[non_exhaustive]
@@ -13,6 +22,7 @@ pub enum Template {
     MultipleSeparated,
     CornerCutting,
     TurnCost(u32),
+    Pink,
 }
 
 impl Template {
@@ -28,6 +38,7 @@ impl Template {
             MultipleSeparated,
             CornerCutting,
             TurnCost(0),
+            Pink,
         ]
     }
 
@@ -58,6 +69,13 @@ impl Template {
         context.insert("end_x", &(field.end_cell.as_ref().unwrap().x + 1));
         context.insert("end_y", &(field.end_cell.as_ref().unwrap().y + 1));
 
+        // pink constraints info
+        let pink_pair_range: Vec<usize> = (1..=(field.pink_pair_map.len() / 2)).collect();
+        let pink_pairs = field.unique_pink_pairs();
+
+        context.insert("pink_pair_range", &pink_pair_range);
+        context.insert("pink_pairs", &prepare_pink_params(pink_pairs));
+
         if let Template::TurnCost(turn_cost) = self {
             context.insert("turn_cost", turn_cost);
         }
@@ -67,6 +85,7 @@ impl Template {
             &field
                 .filled_cells
                 .iter()
+                .filter(|(_, cell_type)| cell_type != &&CellType::Pink)
                 .map(|(cell, _)| format!("({},{})", cell.x + 1, cell.y + 1))
                 .collect::<Vec<_>>()
                 .join(" "),
@@ -75,6 +94,8 @@ impl Template {
         let code = tera
             .render(&format!("{}.tera", self.name()), &context)
             .map_err(|_| AppError::FailedRenderFile)?;
+
+        println!("{}", code);
 
         let xml_input = format!(
             "
@@ -110,6 +131,29 @@ impl Template {
             Template::MultipleSeparated => "path_multiple_separated",
             Template::CornerCutting => "path_corner_cutting",
             Template::TurnCost(_) => "path_turn_cost",
+            Template::Pink => "path_pink",
         }
     }
+}
+
+#[derive(serde::Serialize)]
+struct PinkPairParam {
+    name: String,
+    values: Vec<usize>,
+}
+
+fn prepare_pink_params(pink_pairs: HashSet<(&Cell, &Cell)>) -> Vec<PinkPairParam> {
+    let mut result = Vec::new();
+    let mut counter = 1;
+
+    for (a, b) in pink_pairs {
+        let values = vec![1, a.x + 1, 2, a.y + 1, 3, b.x + 1, 4, b.y + 1];
+        result.push(PinkPairParam {
+            name: format!("pink_pair{}", counter),
+            values,
+        });
+        counter += 1;
+    }
+
+    result
 }
