@@ -165,10 +165,7 @@ impl Field {
                 let current_cell = Cell::new(x, y);
 
                 let color = match self.filled_cells.get(&current_cell) {
-                    Some(cell_type) => match cell_type {
-                        CellType::Green => Color32::DARK_GREEN,
-                        CellType::Pink => Color32::from_rgb(255, 64, 255),
-                    },
+                    Some(cell_type) => cell_type.color(),
                     None => Color32::LIGHT_GRAY,
                 };
 
@@ -299,17 +296,22 @@ impl Field {
         cells
     }
 
-    pub fn handle_adding_cells(&mut self) {
+    pub fn handle_adding_cells(&mut self, cell_type: CellType) {
         if let (Some(start_cell), Some(end_cell)) = (
             self.pos2cell(self.line_segment_start),
             self.pos2cell(self.pointer_click_pos()),
         ) {
             let cells_touched_by_line = self.bresenham_cells(start_cell, end_cell);
-            self.filled_cells.extend(
-                cells_touched_by_line
-                    .into_iter()
-                    .map(|c| (c, CellType::Green)),
-            );
+            for cell in cells_touched_by_line {
+                if let std::collections::hash_map::Entry::Vacant(e) = self.filled_cells.entry(cell)
+                {
+                    if cell_type == CellType::Pink {
+                        self.handle_add_pink_pair_constraint(cell);
+                    } else {
+                        e.insert(cell_type);
+                    }
+                }
+            }
         }
         self.line_segment_start = self.pointer_click_pos();
     }
@@ -320,9 +322,15 @@ impl Field {
             self.pos2cell(self.pointer_click_pos()),
         ) {
             let cells_touched_by_line = self.bresenham_cells(start_cell, end_cell);
-            self.filled_cells.retain(|x, cell_type| {
-                !cells_touched_by_line.contains(x) || *cell_type == CellType::Pink
-            });
+            for cell in cells_touched_by_line {
+                if let Some(&cell_type) = self.filled_cells.get(&cell) {
+                    if cell_type == CellType::Pink {
+                        self.handle_remove_pink_pair_constraint(cell);
+                    } else {
+                        self.filled_cells.remove(&cell);
+                    }
+                }
+            }
         }
         self.line_segment_start = self.pointer_click_pos();
     }
@@ -443,30 +451,23 @@ impl Field {
         None
     }
 
-    pub fn handle_add_pink_pair_constraint(&mut self) {
-        if let Some(cell) = self.clicked_cell() {
-            match self.find_pink_diagonal_match(&cell) {
-                Some((c1, c2)) => {
-                    self.filled_cells.insert(c1, CellType::Pink);
-                    self.filled_cells.insert(c2, CellType::Pink);
+    pub fn handle_add_pink_pair_constraint(&mut self, cell: Cell) {
+        if let Some((c1, c2)) = self.find_pink_diagonal_match(&cell) {
+            self.filled_cells.insert(c1, CellType::Pink);
+            self.filled_cells.insert(c2, CellType::Pink);
 
-                    self.pink_pair_map.insert(c1, c2);
-                    self.pink_pair_map.insert(c2, c1);
-                }
-                None => {}
-            }
+            self.pink_pair_map.insert(c1, c2);
+            self.pink_pair_map.insert(c2, c1);
         }
     }
 
-    pub fn handle_remove_pink_pair_constraint(&mut self) {
-        if let Some(cell) = self.clicked_cell() {
-            if self.is_pink_cell(&cell) {
-                if let Some(pair) = self.pink_pair_map.remove(&cell) {
-                    self.pink_pair_map.remove(&pair);
+    pub fn handle_remove_pink_pair_constraint(&mut self, cell: Cell) {
+        if self.is_pink_cell(&cell) {
+            if let Some(pair) = self.pink_pair_map.remove(&cell) {
+                self.pink_pair_map.remove(&pair);
 
-                    self.filled_cells.remove(&cell);
-                    self.filled_cells.remove(&pair);
-                }
+                self.filled_cells.remove(&cell);
+                self.filled_cells.remove(&pair);
             }
         }
     }

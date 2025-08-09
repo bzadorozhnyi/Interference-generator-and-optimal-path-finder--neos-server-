@@ -14,9 +14,7 @@ impl Solver {
     pub fn variants() -> &'static [Solver] {
         use Solver::*;
 
-        &[
-            Cbc, Copt, Cplex, FicoXpress, Highs, Minto, Mosek, Raposa,
-        ]
+        &[Cbc, Copt, Cplex, FicoXpress, Highs, Minto, Mosek, Raposa]
     }
 
     pub fn name(&self) -> &str {

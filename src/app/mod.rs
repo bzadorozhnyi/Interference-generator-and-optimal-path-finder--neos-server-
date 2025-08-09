@@ -1,10 +1,13 @@
 mod mode;
+mod utils;
 
 use eframe::egui::{self, DragValue, Ui, UserData};
 
 use crate::app::mode::Mode;
+use crate::app::utils::color_button;
 use crate::config::editor::ConfigEditor;
 use crate::error::AppError;
+use crate::field::cell::CellType;
 use crate::neos::api::NeosAPI;
 use crate::neos::response::NeosResponse;
 use crate::neos::solver::Solver;
@@ -29,7 +32,7 @@ impl Default for App {
     fn default() -> Self {
         Self {
             field: Field::new(),
-            mode: Mode::Draw,
+            mode: Mode::Draw(CellType::Green),
             template: Template::Disabled,
             toast: None,
             neos: NeosAPI::new(),
@@ -49,10 +52,14 @@ impl eframe::App for App {
                     self.config_editor.open();
                 }
 
-                ui.selectable_value(&mut self.mode, Mode::Draw, "Draw");
+                for cell_type in CellType::variants() {
+                    if color_button(ui, cell_type.color(), self.mode == Mode::Draw(*cell_type))
+                        .clicked()
+                    {
+                        self.mode = Mode::Draw(*cell_type);
+                    }
+                }
                 ui.selectable_value(&mut self.mode, Mode::Erase, "Erase");
-                ui.selectable_value(&mut self.mode, Mode::AddPinkConstraint, "Add pink");
-                ui.selectable_value(&mut self.mode, Mode::RemovePinkConstraint, "Remove pink");
                 ui.selectable_value(&mut self.mode, Mode::StartSelection, "Start");
                 ui.selectable_value(&mut self.mode, Mode::EndSelection, "Terminal");
 
@@ -71,6 +78,27 @@ impl eframe::App for App {
                             .speed(1.0)
                             .suffix(" Turn cost"),
                     );
+                }
+
+                if let Template::Full {
+                    max_yellow_nodes,
+                    max_orange_nodes,
+                } = &mut self.template
+                {
+                    ui.horizontal(|ui| {
+                        ui.add(
+                            DragValue::new(max_yellow_nodes)
+                                .range(0..=10)
+                                .speed(1.0)
+                                .suffix(" Max yellow"),
+                        );
+                        ui.add(
+                            DragValue::new(max_orange_nodes)
+                                .range(0..=10)
+                                .speed(1.0)
+                                .suffix(" Max orange"),
+                        );
+                    });
                 }
 
                 if ui.button("Clear paths").clicked() {
@@ -154,12 +182,10 @@ impl eframe::App for App {
             ui.label(format!("NEOS response :: {}", self.neos.response));
 
             match self.mode {
-                Mode::Draw => self.field.handle_adding_cells(),
+                Mode::Draw(cell_type) => self.field.handle_adding_cells(cell_type),
                 Mode::Erase => self.field.handle_removing_cells(),
                 Mode::StartSelection => self.field.handle_start_cell_selection(),
                 Mode::EndSelection => self.field.handle_end_cell_selection(),
-                Mode::AddPinkConstraint => self.field.handle_add_pink_pair_constraint(),
-                Mode::RemovePinkConstraint => self.field.handle_remove_pink_pair_constraint(),
             }
 
             if let Ok(neos_response) = self.neos.rx.try_recv() {

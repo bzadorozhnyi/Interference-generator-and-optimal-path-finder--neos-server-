@@ -1,10 +1,10 @@
+use crate::field::cell::CellType;
+
 #[derive(PartialEq)]
 #[non_exhaustive]
 pub enum Mode {
-    Draw,
+    Draw(CellType),
     Erase,
-    AddPinkConstraint,
-    RemovePinkConstraint,
     StartSelection,
     EndSelection,
 }

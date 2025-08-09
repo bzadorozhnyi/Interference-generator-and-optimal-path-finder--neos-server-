@@ -14,7 +14,7 @@ pub struct NeosAPI {
     tx: Sender<NeosResponse>,
     pub rx: Receiver<NeosResponse>,
     pub response: String,
-    pub is_solving_task: bool
+    pub is_solving_task: bool,
 }
 
 impl NeosAPI {
@@ -27,7 +27,7 @@ impl NeosAPI {
             tx,
             rx,
             response: String::new(),
-            is_solving_task: false
+            is_solving_task: false,
         }
     }
 
