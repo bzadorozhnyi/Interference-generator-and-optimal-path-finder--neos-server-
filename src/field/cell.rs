@@ -8,9 +8,10 @@ impl Cell {
     pub fn new(x: usize, y: usize) -> Self {
         Self { x, y }
     }
+}
 
-    pub fn to_zero_indexed(&mut self) {
-        self.x -= 1;
-        self.y -= 1;
-    }
+#[derive(Hash, PartialEq, Eq)]
+pub enum CellType {
+    Green,
+    Pink,
 }

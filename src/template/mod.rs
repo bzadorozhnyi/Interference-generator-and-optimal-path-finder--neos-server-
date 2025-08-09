@@ -1,6 +1,13 @@
+mod param_pink;
+
 use tera::Tera;
 
-use crate::{error::AppError, field::Field, neos::solver::Solver};
+use crate::{
+    error::AppError,
+    field::{cell::CellType, Field},
+    neos::solver::Solver,
+    template::param_pink::PinkPairParam,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[non_exhaustive]
@@ -13,6 +20,7 @@ pub enum Template {
     MultipleSeparated,
     CornerCutting,
     TurnCost(u32),
+    Pink,
 }
 
 impl Template {
@@ -28,6 +36,7 @@ impl Template {
             MultipleSeparated,
             CornerCutting,
             TurnCost(0),
+            Pink,
         ]
     }
 
@@ -47,16 +56,19 @@ impl Template {
         if field.start_cell.is_none() {
             return Err(AppError::StartNotSet);
         }
+        context.insert("start_x", &(field.start_cell.as_ref().unwrap().x));
+        context.insert("start_y", &(field.start_cell.as_ref().unwrap().y));
 
         if field.end_cell.is_none() {
             return Err(AppError::EndNotSet);
         }
+        context.insert("end_x", &(field.end_cell.as_ref().unwrap().x));
+        context.insert("end_y", &(field.end_cell.as_ref().unwrap().y));
 
-        context.insert("start_x", &(field.start_cell.as_ref().unwrap().x + 1));
-        context.insert("start_y", &(field.start_cell.as_ref().unwrap().y + 1));
-
-        context.insert("end_x", &(field.end_cell.as_ref().unwrap().x + 1));
-        context.insert("end_y", &(field.end_cell.as_ref().unwrap().y + 1));
+        let pink_pair_range: Vec<usize> = (1..=(field.pink_pair_map.len() / 2)).collect();
+        context.insert("pink_pair_range", &pink_pair_range);
+        let pink_pairs = field.unique_pink_pairs();
+        context.insert("pink_pairs", &PinkPairParam::new(pink_pairs));
 
         if let Template::TurnCost(turn_cost) = self {
             context.insert("turn_cost", turn_cost);
@@ -67,12 +79,13 @@ impl Template {
             &field
                 .filled_cells
                 .iter()
-                .map(|c| format!("({},{})", c.x + 1, c.y + 1))
+                .filter(|(_, cell_type)| cell_type != &&CellType::Pink)
+                .map(|(cell, _)| format!("({},{})", cell.x, cell.y))
                 .collect::<Vec<_>>()
                 .join(" "),
         );
 
-        let code = tera
+        let ampl_code = tera
             .render(&format!("{}.tera", self.name()), &context)
             .map_err(|_| AppError::FailedRenderFile)?;
 
@@ -94,7 +107,7 @@ impl Template {
             ",
             solver.name(),
             email,
-            code
+            ampl_code
         );
 
         Ok(xml_input)
@@ -110,6 +123,7 @@ impl Template {
             Template::MultipleSeparated => "path_multiple_separated",
             Template::CornerCutting => "path_corner_cutting",
             Template::TurnCost(_) => "path_turn_cost",
+            Template::Pink => "path_pink",
         }
     }
 }

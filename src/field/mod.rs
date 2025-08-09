@@ -1,12 +1,15 @@
 pub mod cell;
 pub mod path;
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use crate::{
     consts::COLORS,
     error::AppError,
-    field::path::{parse_neos_output, Path},
+    field::{
+        cell::CellType,
+        path::{parse_neos_output, Path},
+    },
 };
 use cell::Cell;
 use eframe::egui::{
@@ -17,7 +20,8 @@ pub struct Field {
     pub width: usize,
     pub height: usize,
     cell_size: f32,
-    pub filled_cells: HashSet<Cell>,
+    pub filled_cells: HashMap<Cell, CellType>,
+    pub pink_pair_map: HashMap<Cell, Cell>,
     pub start_cell: Option<Cell>,
     pub end_cell: Option<Cell>,
     pub paths: Option<Vec<Path>>,
@@ -32,7 +36,8 @@ impl Default for Field {
             width: 40,
             height: 20,
             cell_size: 20.0,
-            filled_cells: HashSet::new(),
+            filled_cells: HashMap::new(),
+            pink_pair_map: HashMap::new(),
             start_cell: None,
             end_cell: None,
             paths: None,
@@ -108,14 +113,7 @@ impl Field {
     }
 
     pub fn parse_all_paths(&mut self, output: &str) -> Result<(), AppError> {
-        let (_, mut links) = parse_neos_output(output).map_err(|_| AppError::InvalidPath)?;
-
-        for link in &mut links {
-            for (a, b) in link {
-                a.to_zero_indexed();
-                b.to_zero_indexed();
-            }
-        }
+        let (_, links) = parse_neos_output(output).map_err(|_| AppError::InvalidPath)?;
 
         let paths: Result<Vec<Path>, AppError> = links
             .into_iter()
@@ -144,10 +142,10 @@ impl Field {
     fn cell2pos2(&self, cell: &Cell) -> Pos2 {
         let field_rect = self.response().rect;
 
-        let x = field_rect.left() + cell.x as f32 * self.cell_size + self.cell_size / 2.0;
-        let y = field_rect.top() + cell.y as f32 * self.cell_size + self.cell_size / 2.0;
-
-        Pos2::new(x, y)
+        Pos2::new(
+            field_rect.left() + (cell.x - 1) as f32 * self.cell_size + self.cell_size / 2.0,
+            field_rect.top() + (cell.y - 1) as f32 * self.cell_size + self.cell_size / 2.0,
+        )
     }
 
     pub fn draw(&self) {
@@ -162,14 +160,16 @@ impl Field {
     }
 
     fn draw_field(&self) {
-        for x in 0..self.width {
-            for y in 0..self.height {
+        for x in 1..=self.width {
+            for y in 1..=self.height {
                 let current_cell = Cell::new(x, y);
 
-                let color = if self.filled_cells.contains(&current_cell) {
-                    Color32::DARK_GREEN
-                } else {
-                    Color32::LIGHT_GRAY
+                let color = match self.filled_cells.get(&current_cell) {
+                    Some(cell_type) => match cell_type {
+                        CellType::Green => Color32::DARK_GREEN,
+                        CellType::Pink => Color32::from_rgb(255, 64, 255),
+                    },
+                    None => Color32::LIGHT_GRAY,
                 };
 
                 self.painter().rect(
@@ -192,13 +192,8 @@ impl Field {
     }
 
     fn draw_endpoint(&self, cell: &Option<Cell>, label: &str, color: Color32) {
-        let field_rect = self.response().rect;
-
         if let Some(cell) = cell {
-            let end_pos = Pos2::new(
-                field_rect.left() + cell.x as f32 * self.cell_size + self.cell_size / 2.0,
-                field_rect.top() + cell.y as f32 * self.cell_size + self.cell_size / 2.0,
-            );
+            let end_pos = self.cell2pos2(cell);
             self.painter()
                 .circle(end_pos, self.cell_size / 2.0, color, Stroke::NONE);
             self.painter().text(
@@ -227,8 +222,8 @@ impl Field {
         let field_rect = self.response().rect;
 
         let cell_min = Pos2::new(
-            field_rect.left() + cell.x as f32 * self.cell_size,
-            field_rect.top() + cell.y as f32 * self.cell_size,
+            field_rect.left() + (cell.x - 1) as f32 * self.cell_size,
+            field_rect.top() + (cell.y - 1) as f32 * self.cell_size,
         );
         let cell_max = Pos2::new(cell_min.x + self.cell_size, cell_min.y + self.cell_size);
 
@@ -240,10 +235,10 @@ impl Field {
             Some(pos) => {
                 let field_rect = self.response().rect;
 
-                let x = ((pos.x - field_rect.left()) / self.cell_size).floor() as usize;
-                let y = ((pos.y - field_rect.top()) / self.cell_size).floor() as usize;
+                let x = ((pos.x - field_rect.left()) / self.cell_size).floor() as usize + 1;
+                let y = ((pos.y - field_rect.top()) / self.cell_size).floor() as usize + 1;
 
-                if x < self.width && y < self.height {
+                if x <= self.width && y <= self.height {
                     Some(Cell::new(x, y))
                 } else {
                     None
@@ -310,7 +305,11 @@ impl Field {
             self.pos2cell(self.pointer_click_pos()),
         ) {
             let cells_touched_by_line = self.bresenham_cells(start_cell, end_cell);
-            self.filled_cells.extend(cells_touched_by_line);
+            self.filled_cells.extend(
+                cells_touched_by_line
+                    .into_iter()
+                    .map(|c| (c, CellType::Green)),
+            );
         }
         self.line_segment_start = self.pointer_click_pos();
     }
@@ -321,15 +320,16 @@ impl Field {
             self.pos2cell(self.pointer_click_pos()),
         ) {
             let cells_touched_by_line = self.bresenham_cells(start_cell, end_cell);
-            self.filled_cells
-                .retain(|x| !cells_touched_by_line.contains(x));
+            self.filled_cells.retain(|x, cell_type| {
+                !cells_touched_by_line.contains(x) || *cell_type == CellType::Pink
+            });
         }
         self.line_segment_start = self.pointer_click_pos();
     }
 
     pub fn handle_start_cell_selection(&mut self) {
         if let Some(cell) = self.clicked_cell() {
-            if !self.filled_cells.contains(&cell) {
+            if !self.is_cell_occupied(&cell) {
                 self.start_cell = Some(cell)
             }
         }
@@ -337,7 +337,7 @@ impl Field {
 
     pub fn handle_end_cell_selection(&mut self) {
         if let Some(cell) = self.clicked_cell() {
-            if !self.filled_cells.contains(&cell) {
+            if !self.is_cell_occupied(&cell) {
                 self.end_cell = Some(cell)
             }
         }
@@ -345,5 +345,140 @@ impl Field {
 
     pub fn clear_paths(&mut self) {
         self.paths = None;
+    }
+
+    pub fn is_cell_occupied(&self, cell: &Cell) -> bool {
+        self.filled_cells.contains_key(cell)
+    }
+
+    pub fn is_green_cell(&self, cell: &Cell) -> bool {
+        let cell_type = self.filled_cells.get(cell);
+
+        match cell_type {
+            Some(ct) => ct == &CellType::Green,
+            None => false,
+        }
+    }
+
+    pub fn is_pink_cell(&self, cell: &Cell) -> bool {
+        let cell_type = self.filled_cells.get(cell);
+
+        match cell_type {
+            Some(ct) => ct == &CellType::Pink,
+            None => false,
+        }
+    }
+
+    pub fn contains(&self, cell: &Cell) -> bool {
+        1 <= cell.x && cell.x <= self.width && 1 <= cell.y && cell.y <= self.height
+    }
+
+    /// If the given cell and its diagonal opposite form a valid pink pattern,
+    /// returns a pair (current_cell, diagonal_cell). Otherwise, returns `None`.
+    pub fn find_pink_diagonal_match(&self, cell: &Cell) -> Option<(Cell, Cell)> {
+        if self.is_cell_occupied(cell) {
+            return None;
+        }
+
+        // Case 1: Top-left P, green right and down → bottom-right
+        let right = Cell::new(cell.x + 1, cell.y);
+        let down = Cell::new(cell.x, cell.y + 1);
+        let opposite = Cell::new(cell.x + 1, cell.y + 1);
+
+        if self.contains(&right)
+            && self.is_green_cell(&right)
+            && self.contains(&down)
+            && self.is_green_cell(&down)
+            && self.contains(&opposite)
+            && !self.is_cell_occupied(&opposite)
+        {
+            return Some((*cell, opposite));
+        }
+
+        // Case 2: Bottom-right P, green up and left → top-left
+        let left = Cell::new(cell.x - 1, cell.y);
+        let up = Cell::new(cell.x, cell.y - 1);
+        let opposite = Cell::new(cell.x - 1, cell.y - 1);
+
+        if self.contains(&left)
+            && self.is_green_cell(&left)
+            && self.contains(&up)
+            && self.is_green_cell(&up)
+            && self.contains(&opposite)
+            && !self.is_cell_occupied(&opposite)
+        {
+            return Some((*cell, opposite));
+        }
+
+        // Case 3: Top-right P, green down and left → bottom-left
+        let left = Cell::new(cell.x - 1, cell.y);
+        let down = Cell::new(cell.x, cell.y + 1);
+        let opposite = Cell::new(cell.x - 1, cell.y + 1);
+
+        if self.contains(&left)
+            && self.is_green_cell(&left)
+            && self.contains(&down)
+            && self.is_green_cell(&down)
+            && self.contains(&opposite)
+            && !self.is_cell_occupied(&opposite)
+        {
+            return Some((*cell, opposite));
+        }
+
+        // Case 4: Bottom-left P, green up and right → top-right
+        let up = Cell::new(cell.x, cell.y - 1);
+        let right = Cell::new(cell.x + 1, cell.y);
+        let opposite = Cell::new(cell.x + 1, cell.y - 1);
+
+        if self.contains(&up)
+            && self.is_green_cell(&up)
+            && self.contains(&right)
+            && self.is_green_cell(&right)
+            && self.contains(&opposite)
+            && !self.is_cell_occupied(&opposite)
+        {
+            return Some((*cell, opposite));
+        }
+
+        None
+    }
+
+    pub fn handle_add_pink_pair_constraint(&mut self) {
+        if let Some(cell) = self.clicked_cell() {
+            match self.find_pink_diagonal_match(&cell) {
+                Some((c1, c2)) => {
+                    self.filled_cells.insert(c1, CellType::Pink);
+                    self.filled_cells.insert(c2, CellType::Pink);
+
+                    self.pink_pair_map.insert(c1, c2);
+                    self.pink_pair_map.insert(c2, c1);
+                }
+                None => {}
+            }
+        }
+    }
+
+    pub fn handle_remove_pink_pair_constraint(&mut self) {
+        if let Some(cell) = self.clicked_cell() {
+            if self.is_pink_cell(&cell) {
+                if let Some(pair) = self.pink_pair_map.remove(&cell) {
+                    self.pink_pair_map.remove(&pair);
+
+                    self.filled_cells.remove(&cell);
+                    self.filled_cells.remove(&pair);
+                }
+            }
+        }
+    }
+
+    pub fn unique_pink_pairs(&self) -> HashSet<(&Cell, &Cell)> {
+        let mut set = HashSet::new();
+
+        for (a, b) in self.pink_pair_map.iter() {
+            let pair = if a <= b { (a, b) } else { (b, a) };
+            set.insert(pair);
+        }
+
+        set
     }
 }

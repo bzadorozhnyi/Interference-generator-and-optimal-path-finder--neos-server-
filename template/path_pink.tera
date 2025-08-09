@@ -1,0 +1,75 @@
+param rows integer > 0;
+param cols integer > 0;
+
+set ROWS := 1..rows;
+set COLS := 1..cols;
+
+set NODES := {ROWS, COLS};
+set DISABLED_NODES within NODES default {};
+
+param start{1..2} integer;
+param finish{1..2} integer;
+
+{% for i in pink_pair_range %}
+param pink_pair{{ i }}{1..4} integer;
+{% endfor %}
+
+var x{r in ROWS, c in COLS, nr in ROWS, nc in COLS} binary;
+
+minimize total_distance:
+    sum{r in ROWS, c in COLS,
+        (nr,nc) in {(r+1,c), (r-1,c), (r,c+1), (r,c-1),
+                    (r+1,c+1), (r+1,c-1), (r-1,c+1), (r-1,c-1)}:
+        nr >= 1 and nr <= rows and nc >= 1 and nc <= cols
+        and (r,c) not in DISABLED_NODES and (nr,nc) not in DISABLED_NODES}
+        x[r,c,nr,nc];
+
+subject to flow_balance {r in ROWS, c in COLS: (r,c) not in DISABLED_NODES}:
+    sum{(nr,nc) in {(r+1,c),(r-1,c),(r,c+1),(r,c-1),
+                    (r+1,c+1),(r+1,c-1),(r-1,c+1),(r-1,c-1)}:
+        nr >= 1 and nr <= rows and nc >= 1 and nc <= cols}
+        (x[r,c,nr,nc] - x[nr,nc,r,c])
+    =
+    if (r = start[1] and c = start[2]) then 1
+    else if (r = finish[1] and c = finish[2]) then -1
+    else 0;
+
+subject to disable_nodes {(r,c) in DISABLED_NODES, nr in ROWS, nc in COLS}:
+    x[r,c,nr,nc] = 0;
+
+subject to disable_nodes_reverse {(r,c) in DISABLED_NODES, nr in ROWS, nc in COLS}:
+    x[nr,nc,r,c] = 0;
+
+{% for i in pink_pair_range %}
+subject to pink_block_{{ i }}:
+    sum{r in ROWS, c in COLS} x[r,c,pink_pair{{ i }}[1],pink_pair{{ i }}[2]] +
+    sum{r in ROWS, c in COLS} x[r,c,pink_pair{{ i }}[3],pink_pair{{ i }}[4]] <= 1;
+{% endfor %}
+
+data;
+
+param rows := {{ width }};
+param cols := {{ height }};
+
+param start :=
+1 {{ start_x }}
+2 {{ start_y }};
+
+param finish :=
+1 {{ end_x }}
+2 {{ end_y }};
+
+{% for pair in pink_pairs %}
+param {{ pair.name }} := {{ pair.values | join(sep=" ") }};
+{% endfor %}
+
+set DISABLED_NODES :=
+{{ disabled_nodes }};
+
+solve;
+
+printf "\n--- Path 1 ---\n";
+for {r in ROWS, c in COLS, nr in ROWS, nc in COLS:
+        x[r,c,nr,nc] > 0.5} {
+    printf "  (%d,%d) -> (%d,%d)\n", r, c, nr, nc;
+}
