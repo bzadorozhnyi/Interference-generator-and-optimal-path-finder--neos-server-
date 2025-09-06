@@ -11,8 +11,7 @@ pub struct Config {
 
 impl Config {
     pub fn load() -> Self {
-        let content =
-            std::fs::read_to_string(CONFIG_PATH).unwrap_or_default();
+        let content = std::fs::read_to_string(CONFIG_PATH).unwrap_or_default();
         let config: Self = toml::from_str(&content).unwrap_or_default();
 
         config

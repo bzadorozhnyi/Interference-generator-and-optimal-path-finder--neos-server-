@@ -7,5 +7,5 @@ pub enum AppError {
     FailedRenderFile,
     InvalidAuthCredentials,
     FailedUpdateConfig,
-    FailedTakeScreenshot
+    FailedTakeScreenshot,
 }

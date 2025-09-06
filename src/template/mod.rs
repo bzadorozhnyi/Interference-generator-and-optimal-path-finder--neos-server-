@@ -21,6 +21,10 @@ pub enum Template {
     CornerCutting,
     TurnCost(u32),
     Pink,
+    Full {
+        max_yellow_nodes: usize,
+        max_orange_nodes: usize,
+    },
 }
 
 impl Template {
@@ -37,6 +41,10 @@ impl Template {
             CornerCutting,
             TurnCost(0),
             Pink,
+            Full {
+                max_yellow_nodes: 0,
+                max_orange_nodes: 0,
+            },
         ]
     }
 
@@ -74,16 +82,31 @@ impl Template {
             context.insert("turn_cost", turn_cost);
         }
 
-        context.insert(
-            "disabled_nodes",
-            &field
-                .filled_cells
-                .iter()
-                .filter(|(_, cell_type)| cell_type != &&CellType::Pink)
-                .map(|(cell, _)| format!("({},{})", cell.x, cell.y))
-                .collect::<Vec<_>>()
-                .join(" "),
-        );
+        if let Template::Full {
+            max_yellow_nodes,
+            max_orange_nodes,
+        } = self
+        {
+            context.insert("max_yellow_nodes", max_yellow_nodes);
+            context.insert("max_orange_nodes", max_orange_nodes);
+        }
+
+        for (name, block_cell_type) in [
+            ("disabled_nodes", CellType::Green),
+            ("yellow_nodes", CellType::Yellow),
+            ("orange_nodes", CellType::Orange),
+        ] {
+            context.insert(
+                name,
+                &field
+                    .filled_cells
+                    .iter()
+                    .filter(|(_, cell_type)| cell_type == &&block_cell_type)
+                    .map(|(cell, _)| format!("({},{})", cell.x, cell.y))
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            );
+        }
 
         let ampl_code = tera
             .render(&format!("{}.tera", self.name()), &context)
@@ -124,6 +147,7 @@ impl Template {
             Template::CornerCutting => "path_corner_cutting",
             Template::TurnCost(_) => "path_turn_cost",
             Template::Pink => "path_pink",
+            Template::Full { .. } => "path_full",
         }
     }
 }

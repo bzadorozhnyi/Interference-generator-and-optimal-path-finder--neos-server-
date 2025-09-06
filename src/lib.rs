@@ -3,7 +3,7 @@ pub mod config;
 pub mod consts;
 pub mod error;
 pub mod field;
-pub mod utils;
 pub mod neos;
 pub mod template;
 pub mod toast;
+pub mod utils;
